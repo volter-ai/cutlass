@@ -14,6 +14,7 @@ export function Timeline() {
 
   const videoTracks = tracks.filter((t) => t.type === 'video');
   const audioTracks = tracks.filter((t) => t.type === 'audio');
+  const textTracks = tracks.filter((t) => t.type === 'text');
   const totalWidth = duration * zoom;
 
   return (
@@ -41,6 +42,13 @@ export function Timeline() {
           >
             <Plus size={10} /> Audio
           </button>
+          <button
+            onClick={() => addTrack('text')}
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors hover:opacity-80"
+            style={{ color: 'var(--filler-highlight)', border: '1px solid var(--filler-highlight)' }}
+          >
+            <Plus size={10} /> Text
+          </button>
         </div>
       </div>
 
@@ -57,17 +65,27 @@ export function Timeline() {
             <TimelineTrack key={track.id} track={track} />
           ))}
 
-          {/* Track type divider */}
-          <div
-            className="flex"
-            style={{ height: 2, background: 'var(--border)' }}
-          >
+          {/* V/A divider */}
+          <div className="flex" style={{ height: 2, background: 'var(--border)' }}>
             <div style={{ width: 100 }} />
             <div className="flex-1" />
           </div>
 
           {/* Audio tracks */}
           {audioTracks.map((track) => (
+            <TimelineTrack key={track.id} track={track} />
+          ))}
+
+          {/* A/T divider */}
+          {textTracks.length > 0 && (
+            <div className="flex" style={{ height: 2, background: 'var(--border)' }}>
+              <div style={{ width: 100 }} />
+              <div className="flex-1" />
+            </div>
+          )}
+
+          {/* Text tracks */}
+          {textTracks.map((track) => (
             <TimelineTrack key={track.id} track={track} />
           ))}
 

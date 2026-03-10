@@ -23,6 +23,8 @@
     }
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@tailwindcss/vite": "^4.2.1",
     "immer": "^11.1.4",
     "lucide-react": "^0.577.0",
@@ -50,10 +52,10 @@
   },
   "peerDependenciesMeta": {
     "react": {
-    "optional": true
-  },
-  "react-dom": {
-  "optional": true
-}
-}
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  }
 }

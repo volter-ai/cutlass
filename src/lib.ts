@@ -10,10 +10,13 @@ export { MediaBin } from './components/media-bin/MediaBin';
 export { TranscriptPanel } from './components/transcript/TranscriptPanel';
 export { Viewer } from './components/viewer/Viewer';
 export { Timeline } from './components/timeline/Timeline';
+export { ExportDialog } from './components/export/ExportDialog';
+export { SettingsPanel } from './components/settings/SettingsPanel';
 
 // Hooks (for custom integrations)
 export { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 export { usePlayback } from './hooks/usePlayback';
+export { useAudioPlayback } from './hooks/useAudioPlayback';
 
 // Store (for external state management)
 export {
@@ -30,6 +33,7 @@ export type {
 
 // Services
 export { transcribeMedia } from './services/transcription';
+export { exportTimeline, downloadBlob } from './services/export';
 
 // Types
 export type {
@@ -42,7 +46,15 @@ export type {
   Transcript,
   Tool,
   FillerRemovalMode,
+  Transition,
+  TextOverlay,
+  TextStyle,
+  CaptionStyle,
+  AspectRatio,
+  ProjectSettings,
+  ExportSettings,
 } from './types';
+export { ASPECT_RATIO_DIMENSIONS } from './types';
 
 // Utils
 export { createMediaFile } from './utils/media';

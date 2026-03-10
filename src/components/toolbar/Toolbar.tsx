@@ -5,10 +5,13 @@ import {
   SkipForward,
   MousePointer2,
   Scissors,
+  Type,
   Undo2,
   Redo2,
   ZoomIn,
   ZoomOut,
+  Download,
+  Magnet,
 } from 'lucide-react';
 import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { formatTimecode } from '../../utils/time';
@@ -25,6 +28,10 @@ export function Toolbar() {
     setActiveTool,
     zoom,
     setZoom,
+    snapEnabled,
+    toggleSnap,
+    setShowExportDialog,
+    settings,
   } = useTimelineStore();
 
   const storeApi = useTimelineStoreApi();
@@ -33,6 +40,7 @@ export function Toolbar() {
   const tools: { tool: Tool; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
     { tool: 'select', icon: MousePointer2, label: 'Select', shortcut: 'V' },
     { tool: 'razor', icon: Scissors, label: 'Razor', shortcut: 'C' },
+    { tool: 'text', icon: Type, label: 'Text', shortcut: 'T' },
   ];
 
   return (
@@ -64,6 +72,20 @@ export function Toolbar() {
             {label}
           </button>
         ))}
+
+        {/* Snap toggle */}
+        <button
+          onClick={toggleSnap}
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors"
+          style={{
+            background: snapEnabled ? 'var(--scene-border)' : 'transparent',
+            color: snapEnabled ? 'white' : 'var(--text-secondary)',
+          }}
+          title={`Snap ${snapEnabled ? 'On' : 'Off'} (S)`}
+        >
+          <Magnet size={14} />
+          Snap
+        </button>
       </div>
 
       {/* Divider */}
@@ -100,16 +122,37 @@ export function Toolbar() {
         </button>
       </div>
 
-      {/* Timecode */}
-      <div
-        className="font-mono text-xs px-3 py-1 rounded"
-        style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-      >
-        {formatTimecode(playheadPosition)}
+      {/* Timecode + Aspect Ratio badge */}
+      <div className="flex items-center gap-2">
+        <div
+          className="font-mono text-xs px-3 py-1 rounded"
+          style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+        >
+          {formatTimecode(playheadPosition)}
+        </div>
+        <span
+          className="text-xs px-1.5 py-0.5 rounded"
+          style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)' }}
+        >
+          {settings.aspectRatio}
+        </span>
       </div>
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Export */}
+      <button
+        onClick={() => setShowExportDialog(true)}
+        className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold transition-colors hover:opacity-90"
+        style={{ background: 'var(--accent)', color: 'white' }}
+      >
+        <Download size={12} />
+        Export
+      </button>
+
+      {/* Divider */}
+      <div className="w-px h-6" style={{ background: 'var(--border)' }} />
 
       {/* Undo / Redo */}
       <div className="flex items-center gap-1">

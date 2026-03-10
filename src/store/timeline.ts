@@ -8,10 +8,44 @@ import type {
   TimelineClip,
   Track,
   Transcript,
+  TextOverlay,
+  TextStyle,
   Scene,
   Tool,
   FillerRemovalMode,
+  Transition,
+  AspectRatio,
+  ProjectSettings,
+  CaptionStyle,
+  ASPECT_RATIO_DIMENSIONS,
 } from '../types';
+
+const ASPECT_DIMS: typeof ASPECT_RATIO_DIMENSIONS = {
+  '16:9': { width: 1920, height: 1080 },
+  '9:16': { width: 1080, height: 1920 },
+  '1:1': { width: 1080, height: 1080 },
+  '4:5': { width: 1080, height: 1350 },
+};
+
+const DEFAULT_CAPTION_STYLE: CaptionStyle = {
+  preset: 'default',
+  fontFamily: 'Arial',
+  fontSize: 24,
+  color: '#ffffff',
+  backgroundColor: 'rgba(0,0,0,0.7)',
+  position: 'bottom',
+  maxWords: 8,
+};
+
+const DEFAULT_SETTINGS: ProjectSettings = {
+  aspectRatio: '16:9',
+  resolution: { width: 1920, height: 1080 },
+  frameRate: 30,
+  captionStyle: DEFAULT_CAPTION_STYLE,
+  deepgramApiKey: typeof localStorage !== 'undefined'
+    ? localStorage.getItem('cutlass-deepgram-key') ?? ''
+    : '',
+};
 
 export interface TimelineState {
   // Media
@@ -20,21 +54,32 @@ export interface TimelineState {
   // Timeline
   tracks: Track[];
   clips: Record<string, TimelineClip>;
+  textOverlays: Record<string, TextOverlay>;
   playheadPosition: number;
   isPlaying: boolean;
   duration: number;
-  zoom: number; // pixels per second
+  zoom: number;
+  snapEnabled: boolean;
 
   // Selection
   selectedClipIds: string[];
+  selectedTextOverlayId: string | null;
   activeTool: Tool;
 
   // Transcript
   transcripts: Record<string, Transcript>;
   activeTranscriptMediaId: string | null;
 
+  // Project
+  settings: ProjectSettings;
+
+  // Export
+  isExporting: boolean;
+  exportProgress: number;
+
   // UI
-  leftPanelTab: 'media' | 'transcript';
+  leftPanelTab: 'media' | 'transcript' | 'settings';
+  showExportDialog: boolean;
 
   // Actions - Media
   addMediaFile: (file: MediaFile) => void;
@@ -54,9 +99,17 @@ export interface TimelineState {
   trimClipEnd: (clipId: string, newEndTime: number) => void;
   splitClipAtPlayhead: (clipId: string) => void;
   rippleDelete: (clipId: string) => void;
+  setClipVolume: (clipId: string, volume: number) => void;
+  setClipTransition: (clipId: string, edge: 'in' | 'out', transition: Transition | undefined) => void;
+
+  // Actions - Text Overlays
+  addTextOverlay: (trackId: string, startTime: number, text: string) => string;
+  updateTextOverlay: (id: string, updates: Partial<Pick<TextOverlay, 'text' | 'startTime' | 'duration' | 'style'>>) => void;
+  removeTextOverlay: (id: string) => void;
+  selectTextOverlay: (id: string | null) => void;
 
   // Actions - Tracks
-  addTrack: (type: 'video' | 'audio') => string;
+  addTrack: (type: 'video' | 'audio' | 'text') => string;
   removeTrack: (trackId: string) => void;
   toggleTrackMute: (trackId: string) => void;
   toggleTrackLock: (trackId: string) => void;
@@ -65,6 +118,7 @@ export interface TimelineState {
   setPlayheadPosition: (time: number) => void;
   setIsPlaying: (playing: boolean) => void;
   setZoom: (zoom: number) => void;
+  toggleSnap: () => void;
 
   // Actions - Selection
   selectClip: (clipId: string, multi?: boolean) => void;
@@ -77,12 +131,24 @@ export interface TimelineState {
   removeFillerWords: (mediaFileId: string, mode: FillerRemovalMode) => void;
   detectScenes: (mediaFileId: string) => void;
 
+  // Actions - Settings
+  setAspectRatio: (ratio: AspectRatio) => void;
+  setDeepgramApiKey: (key: string) => void;
+  setCaptionStyle: (style: Partial<CaptionStyle>) => void;
+  setSettings: (settings: Partial<ProjectSettings>) => void;
+
+  // Actions - Export
+  setIsExporting: (exporting: boolean) => void;
+  setExportProgress: (progress: number) => void;
+  setShowExportDialog: (show: boolean) => void;
+
   // Actions - UI
-  setLeftPanelTab: (tab: 'media' | 'transcript') => void;
+  setLeftPanelTab: (tab: 'media' | 'transcript' | 'settings') => void;
 
   // Computed
   getClipsForTrack: (trackId: string) => TimelineClip[];
   getClipAtPlayhead: (trackId: string) => TimelineClip | undefined;
+  getSnapPoints: () => number[];
   recalculateDuration: () => void;
 }
 
@@ -93,12 +159,27 @@ const DEFAULT_TRACKS: Track[] = [
   { id: 'v1', type: 'video', name: 'V1', muted: false, locked: false, height: 60 },
   { id: 'a1', type: 'audio', name: 'A1', muted: false, locked: false, height: 50 },
   { id: 'a2', type: 'audio', name: 'A2', muted: false, locked: false, height: 50 },
+  { id: 't1', type: 'text', name: 'T1', muted: false, locked: false, height: 40 },
 ];
 
 export interface TimelineStoreOptions {
   initialTracks?: Track[];
   initialMediaFiles?: Record<string, MediaFile>;
+  initialSettings?: Partial<ProjectSettings>;
 }
+
+const DEFAULT_TEXT_STYLE: TextStyle = {
+  fontFamily: 'Arial',
+  fontSize: 48,
+  fontWeight: 'bold',
+  color: '#ffffff',
+  backgroundColor: 'transparent',
+  x: 50,
+  y: 50,
+  textAlign: 'center',
+  outline: true,
+  outlineColor: '#000000',
+};
 
 export function createTimelineStore(options?: TimelineStoreOptions) {
   return create<TimelineState>()(
@@ -107,15 +188,22 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         mediaFiles: options?.initialMediaFiles ?? {},
         tracks: options?.initialTracks ?? DEFAULT_TRACKS,
         clips: {},
+        textOverlays: {},
         playheadPosition: 0,
         isPlaying: false,
         duration: 0,
         zoom: 100,
+        snapEnabled: true,
         selectedClipIds: [],
+        selectedTextOverlayId: null,
         activeTool: 'select' as Tool,
         transcripts: {},
         activeTranscriptMediaId: null,
+        settings: { ...DEFAULT_SETTINGS, ...options?.initialSettings },
+        isExporting: false,
+        exportProgress: 0,
         leftPanelTab: 'media' as const,
+        showExportDialog: false,
 
         addMediaFile: (file) =>
           set((state) => {
@@ -143,6 +231,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
               mediaOffset,
               name: mediaFile.name,
               type: mediaFile.type === 'audio' ? 'audio' : 'video',
+              volume: 1,
             };
           });
           get().recalculateDuration();
@@ -199,6 +288,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
               mediaOffset: clip.mediaOffset + splitPoint,
               name: clip.name,
               type: clip.type,
+              volume: clip.volume,
             };
 
             clip.duration = splitPoint;
@@ -215,7 +305,6 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             delete state.clips[clipId];
             state.selectedClipIds = state.selectedClipIds.filter((id) => id !== clipId);
 
-            // Shift subsequent clips on the same track
             Object.values(state.clips).forEach((c) => {
               if (c.trackId === trackId && c.startTime >= clipEnd) {
                 c.startTime -= gap;
@@ -223,18 +312,74 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             });
           }),
 
+        setClipVolume: (clipId, volume) =>
+          set((state) => {
+            const clip = state.clips[clipId];
+            if (clip) clip.volume = Math.max(0, Math.min(2, volume));
+          }),
+
+        setClipTransition: (clipId, edge, transition) =>
+          set((state) => {
+            const clip = state.clips[clipId];
+            if (!clip) return;
+            if (edge === 'in') {
+              clip.transitionIn = transition;
+            } else {
+              clip.transitionOut = transition;
+            }
+          }),
+
+        // Text Overlays
+        addTextOverlay: (trackId, startTime, text) => {
+          const id = uuid();
+          set((state) => {
+            state.textOverlays[id] = {
+              id,
+              trackId,
+              startTime,
+              duration: 3,
+              text,
+              style: { ...DEFAULT_TEXT_STYLE },
+            };
+          });
+          get().recalculateDuration();
+          return id;
+        },
+
+        updateTextOverlay: (id, updates) =>
+          set((state) => {
+            const overlay = state.textOverlays[id];
+            if (!overlay) return;
+            if (updates.text !== undefined) overlay.text = updates.text;
+            if (updates.startTime !== undefined) overlay.startTime = updates.startTime;
+            if (updates.duration !== undefined) overlay.duration = updates.duration;
+            if (updates.style) Object.assign(overlay.style, updates.style);
+          }),
+
+        removeTextOverlay: (id) =>
+          set((state) => {
+            delete state.textOverlays[id];
+            if (state.selectedTextOverlayId === id) state.selectedTextOverlayId = null;
+          }),
+
+        selectTextOverlay: (id) =>
+          set((state) => {
+            state.selectedTextOverlayId = id;
+            if (id) state.selectedClipIds = [];
+          }),
+
         addTrack: (type) => {
           const trackId = uuid();
           set((state) => {
-            const trackNum =
-              state.tracks.filter((t) => t.type === type).length + 1;
+            const trackNum = state.tracks.filter((t) => t.type === type).length + 1;
+            const prefix = type === 'video' ? 'V' : type === 'audio' ? 'A' : 'T';
             const track: Track = {
               id: trackId,
               type,
-              name: `${type === 'video' ? 'V' : 'A'}${trackNum}`,
+              name: `${prefix}${trackNum}`,
               muted: false,
               locked: false,
-              height: type === 'video' ? 60 : 50,
+              height: type === 'video' ? 60 : type === 'audio' ? 50 : 40,
             };
             if (type === 'video') {
               state.tracks.unshift(track);
@@ -251,6 +396,11 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             Object.keys(state.clips).forEach((clipId) => {
               if (state.clips[clipId].trackId === trackId) {
                 delete state.clips[clipId];
+              }
+            });
+            Object.keys(state.textOverlays).forEach((id) => {
+              if (state.textOverlays[id].trackId === trackId) {
+                delete state.textOverlays[id];
               }
             });
           }),
@@ -282,8 +432,14 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             state.zoom = Math.max(10, Math.min(500, zoom));
           }),
 
+        toggleSnap: () =>
+          set((state) => {
+            state.snapEnabled = !state.snapEnabled;
+          }),
+
         selectClip: (clipId, multi = false) =>
           set((state) => {
+            state.selectedTextOverlayId = null;
             if (multi) {
               if (state.selectedClipIds.includes(clipId)) {
                 state.selectedClipIds = state.selectedClipIds.filter((id) => id !== clipId);
@@ -298,6 +454,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         clearSelection: () =>
           set((state) => {
             state.selectedClipIds = [];
+            state.selectedTextOverlayId = null;
           }),
 
         setActiveTool: (tool) =>
@@ -323,28 +480,19 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             transcript.segments.forEach((segment) => {
               segment.words.forEach((word) => {
                 if (!word.isFiller) return;
-
                 switch (mode) {
                   case 'delete':
-                    word.isRemoved = true;
-                    break;
                   case 'gap':
-                    // Mark as removed but keep timing (creates silence)
+                  case 'transcript-only':
                     word.isRemoved = true;
                     break;
                   case 'ignore':
-                    // Keep in audio but mark visually
                     word.isRemoved = false;
-                    break;
-                  case 'transcript-only':
-                    // Remove from transcript display only
-                    word.isRemoved = true;
                     break;
                 }
               });
             });
 
-            // For 'delete' mode, create edit points on the timeline
             if (mode === 'delete') {
               const fillerRegions: { start: number; end: number }[] = [];
               transcript.segments.forEach((segment) => {
@@ -355,7 +503,6 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                 });
               });
 
-              // Find clips that use this media file and split around fillers
               const clipsForMedia = Object.values(state.clips).filter(
                 (c) => c.mediaFileId === mediaFileId,
               );
@@ -367,7 +514,6 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                   const regionEndInClip = region.end - clip.mediaOffset + clip.startTime;
 
                   if (regionStartInClip > clip.startTime && regionEndInClip < clipEnd) {
-                    // Split and remove the filler region
                     const newClipId = uuid();
                     const fillerDuration = region.end - region.start;
 
@@ -380,11 +526,10 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                       mediaOffset: clip.mediaOffset + (regionEndInClip - clip.startTime),
                       name: clip.name,
                       type: clip.type,
+                      volume: clip.volume,
                     };
 
                     clip.duration = regionStartInClip - clip.startTime;
-
-                    // Shift the new clip to close the gap
                     state.clips[newClipId].startTime -= fillerDuration;
                   }
                 });
@@ -397,7 +542,6 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             const transcript = state.transcripts[mediaFileId];
             if (!transcript) return;
 
-            // Detect scenes based on long pauses between segments and speaker changes
             const scenes: Scene[] = [];
             let currentScene: Scene | null = null;
 
@@ -406,11 +550,8 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
               const gapFromPrev = prevSegment ? segment.start - prevSegment.end : 0;
               const speakerChanged = prevSegment && prevSegment.speaker !== segment.speaker;
 
-              // Start new scene on: first segment, long pause (>2s), or speaker change
               if (!currentScene || gapFromPrev > 2 || speakerChanged) {
-                if (currentScene) {
-                  scenes.push(currentScene);
-                }
+                if (currentScene) scenes.push(currentScene);
                 currentScene = {
                   id: uuid(),
                   name: `Scene ${scenes.length + 1}`,
@@ -419,17 +560,52 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                   clipIds: [],
                 };
               }
-
-              if (currentScene) {
-                currentScene.end = segment.end;
-              }
+              if (currentScene) currentScene.end = segment.end;
             });
 
-            if (currentScene) {
-              scenes.push(currentScene);
-            }
-
+            if (currentScene) scenes.push(currentScene);
             transcript.scenes = scenes;
+          }),
+
+        // Settings
+        setAspectRatio: (ratio) =>
+          set((state) => {
+            state.settings.aspectRatio = ratio;
+            state.settings.resolution = ASPECT_DIMS[ratio];
+          }),
+
+        setDeepgramApiKey: (key) =>
+          set((state) => {
+            state.settings.deepgramApiKey = key;
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('cutlass-deepgram-key', key);
+            }
+          }),
+
+        setCaptionStyle: (style) =>
+          set((state) => {
+            Object.assign(state.settings.captionStyle, style);
+          }),
+
+        setSettings: (settings) =>
+          set((state) => {
+            Object.assign(state.settings, settings);
+          }),
+
+        // Export
+        setIsExporting: (exporting) =>
+          set((state) => {
+            state.isExporting = exporting;
+          }),
+
+        setExportProgress: (progress) =>
+          set((state) => {
+            state.exportProgress = progress;
+          }),
+
+        setShowExportDialog: (show) =>
+          set((state) => {
+            state.showExportDialog = show;
           }),
 
         setLeftPanelTab: (tab) =>
@@ -452,21 +628,47 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           );
         },
 
+        getSnapPoints: () => {
+          const state = get();
+          const points: number[] = [0];
+          Object.values(state.clips).forEach((clip) => {
+            points.push(clip.startTime);
+            points.push(clip.startTime + clip.duration);
+          });
+          Object.values(state.textOverlays).forEach((overlay) => {
+            points.push(overlay.startTime);
+            points.push(overlay.startTime + overlay.duration);
+          });
+          // Scene boundaries
+          Object.values(state.transcripts).forEach((t) => {
+            t.scenes.forEach((s) => {
+              points.push(s.start);
+              points.push(s.end);
+            });
+          });
+          return [...new Set(points)].sort((a, b) => a - b);
+        },
+
         recalculateDuration: () =>
           set((state) => {
-            const maxEnd = Object.values(state.clips).reduce(
-              (max, clip) => Math.max(max, clip.startTime + clip.duration),
-              0,
-            );
-            state.duration = maxEnd + 5; // 5s padding
+            let maxEnd = 0;
+            Object.values(state.clips).forEach((clip) => {
+              maxEnd = Math.max(maxEnd, clip.startTime + clip.duration);
+            });
+            Object.values(state.textOverlays).forEach((overlay) => {
+              maxEnd = Math.max(maxEnd, overlay.startTime + overlay.duration);
+            });
+            state.duration = maxEnd + 5;
           }),
       })),
       {
         partialize: (state) => ({
           tracks: state.tracks,
           clips: state.clips,
+          textOverlays: state.textOverlays,
           transcripts: state.transcripts,
           mediaFiles: state.mediaFiles,
+          settings: state.settings,
         }),
       },
     ),
@@ -476,7 +678,6 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
 // Context for dependency injection
 export const TimelineStoreContext = createContext<TimelineStore | null>(null);
 
-// Default singleton for standalone usage
 let defaultStore: TimelineStore | null = null;
 
 function getDefaultStore(): TimelineStore {
@@ -486,11 +687,6 @@ function getDefaultStore(): TimelineStore {
   return defaultStore;
 }
 
-/**
- * Hook that reads from either:
- * 1. A store provided via CutlassProvider context (for embedded usage)
- * 2. A default singleton store (for standalone usage)
- */
 export function useTimelineStore(): TimelineState;
 export function useTimelineStore<T>(selector: (state: TimelineState) => T): T;
 export function useTimelineStore<T>(selector?: (state: TimelineState) => T) {
@@ -502,10 +698,6 @@ export function useTimelineStore<T>(selector?: (state: TimelineState) => T) {
   return store();
 }
 
-/**
- * Access the raw store (needed for temporal undo/redo).
- * Returns the Zustand store object, not the state.
- */
 export function useTimelineStoreApi() {
   const contextStore = useContext(TimelineStoreContext);
   return contextStore ?? getDefaultStore();

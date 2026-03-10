@@ -72,6 +72,14 @@ export function useKeyboardShortcuts() {
           if (!isMeta) store.setActiveTool('razor');
           break;
 
+        case 't':
+          if (!isMeta) store.setActiveTool('text');
+          break;
+
+        case 's':
+          if (!isMeta) store.toggleSnap();
+          break;
+
         case 'ArrowLeft':
           e.preventDefault();
           store.setPlayheadPosition(

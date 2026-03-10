@@ -12,11 +12,14 @@ const FILLER_WORDS = new Set([
  * 1. Deepgram API (if VITE_DEEPGRAM_API_KEY is set)
  * 2. Demo mode (generates realistic mock transcript)
  */
-export async function transcribeMedia(media: MediaFile): Promise<Transcript> {
-  const apiKey = import.meta.env.VITE_DEEPGRAM_API_KEY;
+export async function transcribeMedia(media: MediaFile, apiKey?: string): Promise<Transcript> {
+  // Check for API key: explicit param > env var > localStorage
+  const key = apiKey
+    || import.meta.env.VITE_DEEPGRAM_API_KEY
+    || (typeof localStorage !== 'undefined' ? localStorage.getItem('cutlass-deepgram-key') : null);
 
-  if (apiKey) {
-    return transcribeWithDeepgram(media, apiKey);
+  if (key) {
+    return transcribeWithDeepgram(media, key);
   }
 
   // Demo mode: generate a mock transcript

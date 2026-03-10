@@ -1,15 +1,21 @@
 import { Toolbar } from './components/toolbar/Toolbar';
 import { MediaBin } from './components/media-bin/MediaBin';
 import { TranscriptPanel } from './components/transcript/TranscriptPanel';
+import { SettingsPanel } from './components/settings/SettingsPanel';
 import { Viewer } from './components/viewer/Viewer';
 import { Timeline } from './components/timeline/Timeline';
+import { ExportDialog } from './components/export/ExportDialog';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { usePlayback } from './hooks/usePlayback';
+import { useAudioPlayback } from './hooks/useAudioPlayback';
 import { useTimelineStore } from './store/timeline';
+
+const TABS = ['media', 'transcript', 'settings'] as const;
 
 export default function App() {
   useKeyboardShortcuts();
   usePlayback();
+  useAudioPlayback();
 
   const leftPanelTab = useTimelineStore((s) => s.leftPanelTab);
   const setLeftPanelTab = useTimelineStore((s) => s.setLeftPanelTab);
@@ -21,40 +27,34 @@ export default function App() {
 
       {/* Main Content */}
       <div className="flex flex-1 min-h-0">
-        {/* Left Panel: Media Bin / Transcript */}
+        {/* Left Panel: Media Bin / Transcript / Settings */}
         <div
           className="flex flex-col border-r"
           style={{ width: 280, borderColor: 'var(--border)', background: 'var(--bg-primary)' }}
         >
           {/* Tab switcher */}
           <div className="flex border-b" style={{ borderColor: 'var(--border)' }}>
-            <button
-              onClick={() => setLeftPanelTab('media')}
-              className="flex-1 px-3 py-1.5 text-xs font-semibold transition-colors"
-              style={{
-                background: leftPanelTab === 'media' ? 'var(--bg-surface)' : 'transparent',
-                color: leftPanelTab === 'media' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                borderBottom: leftPanelTab === 'media' ? '2px solid var(--accent)' : '2px solid transparent',
-              }}
-            >
-              Media
-            </button>
-            <button
-              onClick={() => setLeftPanelTab('transcript')}
-              className="flex-1 px-3 py-1.5 text-xs font-semibold transition-colors"
-              style={{
-                background: leftPanelTab === 'transcript' ? 'var(--bg-surface)' : 'transparent',
-                color: leftPanelTab === 'transcript' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                borderBottom: leftPanelTab === 'transcript' ? '2px solid var(--accent)' : '2px solid transparent',
-              }}
-            >
-              Transcript
-            </button>
+            {TABS.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setLeftPanelTab(tab)}
+                className="flex-1 px-3 py-1.5 text-xs font-semibold transition-colors capitalize"
+                style={{
+                  background: leftPanelTab === tab ? 'var(--bg-surface)' : 'transparent',
+                  color: leftPanelTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  borderBottom: leftPanelTab === tab ? '2px solid var(--accent)' : '2px solid transparent',
+                }}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
 
           {/* Panel content */}
           <div className="flex-1 min-h-0">
-            {leftPanelTab === 'media' ? <MediaBin /> : <TranscriptPanel />}
+            {leftPanelTab === 'media' && <MediaBin />}
+            {leftPanelTab === 'transcript' && <TranscriptPanel />}
+            {leftPanelTab === 'settings' && <SettingsPanel />}
           </div>
         </div>
 
@@ -71,6 +71,9 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Export Dialog (modal) */}
+      <ExportDialog />
     </div>
   );
 }

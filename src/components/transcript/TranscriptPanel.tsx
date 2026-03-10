@@ -20,6 +20,7 @@ export function TranscriptPanel() {
     removeFillerWords,
     detectScenes,
     setPlayheadPosition,
+    settings,
   } = useTimelineStore();
 
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -36,7 +37,7 @@ export function TranscriptPanel() {
       try {
         const media = mediaFiles[mediaFileId];
         if (!media) return;
-        const transcript = await transcribeMedia(media);
+        const transcript = await transcribeMedia(media, settings.deepgramApiKey || undefined);
         setTranscript(mediaFileId, transcript);
         setActiveTranscriptMediaId(mediaFileId);
       } catch (err) {
@@ -45,7 +46,7 @@ export function TranscriptPanel() {
         setIsTranscribing(false);
       }
     },
-    [mediaFiles, setTranscript, setActiveTranscriptMediaId],
+    [mediaFiles, setTranscript, setActiveTranscriptMediaId, settings.deepgramApiKey],
   );
 
   const handleWordClick = useCallback(
