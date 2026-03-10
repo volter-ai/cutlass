@@ -100,7 +100,10 @@ export interface TimelineState {
   splitClipAtPlayhead: (clipId: string) => void;
   rippleDelete: (clipId: string) => void;
   setClipVolume: (clipId: string, volume: number) => void;
+  setClipFade: (clipId: string, edge: 'in' | 'out', duration: number) => void;
   setClipTransition: (clipId: string, edge: 'in' | 'out', transition: Transition | undefined) => void;
+  extractAudioFromClip: (clipId: string) => string | null;
+  unlinkClips: (clipId: string) => void;
 
   // Actions - Text Overlays
   addTextOverlay: (trackId: string, startTime: number, text: string) => string;
@@ -113,6 +116,7 @@ export interface TimelineState {
   removeTrack: (trackId: string) => void;
   toggleTrackMute: (trackId: string) => void;
   toggleTrackLock: (trackId: string) => void;
+  setTrackVolume: (trackId: string, volume: number) => void;
 
   // Actions - Playback
   setPlayheadPosition: (time: number) => void;
@@ -155,11 +159,11 @@ export interface TimelineState {
 export type TimelineStore = ReturnType<typeof createTimelineStore>;
 
 const DEFAULT_TRACKS: Track[] = [
-  { id: 'v2', type: 'video', name: 'V2', muted: false, locked: false, height: 60 },
-  { id: 'v1', type: 'video', name: 'V1', muted: false, locked: false, height: 60 },
-  { id: 'a1', type: 'audio', name: 'A1', muted: false, locked: false, height: 50 },
-  { id: 'a2', type: 'audio', name: 'A2', muted: false, locked: false, height: 50 },
-  { id: 't1', type: 'text', name: 'T1', muted: false, locked: false, height: 40 },
+  { id: 'v2', type: 'video', name: 'V2', muted: false, locked: false, height: 60, volume: 1 },
+  { id: 'v1', type: 'video', name: 'V1', muted: false, locked: false, height: 60, volume: 1 },
+  { id: 'a1', type: 'audio', name: 'A1', muted: false, locked: false, height: 50, volume: 1 },
+  { id: 'a2', type: 'audio', name: 'A2', muted: false, locked: false, height: 50, volume: 1 },
+  { id: 't1', type: 'text', name: 'T1', muted: false, locked: false, height: 40, volume: 1 },
 ];
 
 export interface TimelineStoreOptions {
@@ -232,6 +236,8 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
               name: mediaFile.name,
               type: mediaFile.type === 'audio' ? 'audio' : 'video',
               volume: 1,
+              fadeIn: 0,
+              fadeOut: 0,
             };
           });
           get().recalculateDuration();
@@ -248,8 +254,19 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           set((state) => {
             const clip = state.clips[clipId];
             if (!clip) return;
+            const delta = Math.max(0, newStartTime) - clip.startTime;
             clip.startTime = Math.max(0, newStartTime);
             if (newTrackId) clip.trackId = newTrackId;
+
+            // Move linked clip by the same delta
+            if (clip.linkedGroupId) {
+              const linked = Object.values(state.clips).find(
+                (c) => c.id !== clipId && c.linkedGroupId === clip.linkedGroupId,
+              );
+              if (linked) {
+                linked.startTime = Math.max(0, linked.startTime + delta);
+              }
+            }
           }),
 
         trimClipStart: (clipId, newStartTime) =>
@@ -289,9 +306,12 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
               name: clip.name,
               type: clip.type,
               volume: clip.volume,
+              fadeIn: 0,
+              fadeOut: clip.fadeOut,
             };
 
             clip.duration = splitPoint;
+            clip.fadeOut = 0;
           }),
 
         rippleDelete: (clipId) =>
@@ -318,6 +338,18 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             if (clip) clip.volume = Math.max(0, Math.min(2, volume));
           }),
 
+        setClipFade: (clipId, edge, duration) =>
+          set((state) => {
+            const clip = state.clips[clipId];
+            if (!clip) return;
+            const fadeDuration = Math.max(0, Math.min(duration, clip.duration / 2));
+            if (edge === 'in') {
+              clip.fadeIn = fadeDuration;
+            } else {
+              clip.fadeOut = fadeDuration;
+            }
+          }),
+
         setClipTransition: (clipId, edge, transition) =>
           set((state) => {
             const clip = state.clips[clipId];
@@ -327,6 +359,71 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             } else {
               clip.transitionOut = transition;
             }
+            // If video clip has linked audio, apply matching audio fade
+            if (clip.linkedGroupId && clip.type === 'video' && transition) {
+              const linked = Object.values(state.clips).find(
+                (c) => c.id !== clipId && c.linkedGroupId === clip.linkedGroupId,
+              );
+              if (linked) {
+                if (edge === 'in') {
+                  linked.fadeIn = transition.duration;
+                } else {
+                  linked.fadeOut = transition.duration;
+                }
+              }
+            }
+          }),
+
+        extractAudioFromClip: (clipId) => {
+          const state = get();
+          const clip = state.clips[clipId];
+          if (!clip || clip.type !== 'video') return null;
+
+          // Find or create an audio track
+          let audioTrack = state.tracks.find((t) => t.type === 'audio');
+          let audioTrackId = audioTrack?.id;
+          if (!audioTrackId) {
+            audioTrackId = get().addTrack('audio');
+          }
+
+          const groupId = clip.linkedGroupId || uuid();
+          const audioClipId = uuid();
+
+          set((s) => {
+            // Set linked group on source video clip
+            s.clips[clipId].linkedGroupId = groupId;
+            // Create audio clip
+            s.clips[audioClipId] = {
+              id: audioClipId,
+              mediaFileId: clip.mediaFileId,
+              trackId: audioTrackId!,
+              startTime: clip.startTime,
+              duration: clip.duration,
+              mediaOffset: clip.mediaOffset,
+              name: `${clip.name} (audio)`,
+              type: 'audio',
+              volume: clip.volume,
+              fadeIn: clip.fadeIn,
+              fadeOut: clip.fadeOut,
+              linkedGroupId: groupId,
+            };
+          });
+
+          get().recalculateDuration();
+          return audioClipId;
+        },
+
+        unlinkClips: (clipId) =>
+          set((state) => {
+            const clip = state.clips[clipId];
+            if (!clip?.linkedGroupId) return;
+            const groupId = clip.linkedGroupId;
+            // Remove linked group from all clips in the group
+            Object.values(state.clips).forEach((c) => {
+              if (c.linkedGroupId === groupId) {
+                c.linkedGroupId = undefined;
+              }
+            });
           }),
 
         // Text Overlays
@@ -380,6 +477,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
               muted: false,
               locked: false,
               height: type === 'video' ? 60 : type === 'audio' ? 50 : 40,
+              volume: 1,
             };
             if (type === 'video') {
               state.tracks.unshift(track);
@@ -415,6 +513,12 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           set((state) => {
             const track = state.tracks.find((t) => t.id === trackId);
             if (track) track.locked = !track.locked;
+          }),
+
+        setTrackVolume: (trackId, volume) =>
+          set((state) => {
+            const track = state.tracks.find((t) => t.id === trackId);
+            if (track) track.volume = Math.max(0, Math.min(2, volume));
           }),
 
         setPlayheadPosition: (time) =>
@@ -527,6 +631,8 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                       name: clip.name,
                       type: clip.type,
                       volume: clip.volume,
+                      fadeIn: 0,
+                      fadeOut: clip.fadeOut,
                     };
 
                     clip.duration = regionStartInClip - clip.startTime;

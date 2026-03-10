@@ -22,8 +22,14 @@ export interface TimelineClip {
   mediaOffset: number;
   name: string;
   type: 'video' | 'audio';
-  /** Volume level 0-1 */
+  /** Volume level 0-2 */
   volume: number;
+  /** Audio fade in duration (seconds) */
+  fadeIn: number;
+  /** Audio fade out duration (seconds) */
+  fadeOut: number;
+  /** Links extracted audio clip to its source video clip */
+  linkedGroupId?: string;
   /** Transition applied to the start of this clip */
   transitionIn?: Transition;
   /** Transition applied to the end of this clip */
@@ -42,6 +48,8 @@ export interface Track {
   muted: boolean;
   locked: boolean;
   height: number;
+  /** Master volume for this track (0-2, default 1) */
+  volume: number;
 }
 
 export interface TextOverlay {

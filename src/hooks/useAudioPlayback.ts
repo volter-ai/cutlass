@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useTimelineStore } from '../store/timeline';
+import type { TimelineClip } from '../types';
 
 interface AudioSource {
   element: HTMLAudioElement;
@@ -8,9 +9,32 @@ interface AudioSource {
 }
 
 /**
+ * Compute fade volume multiplier based on playhead position within a clip.
+ * Returns 0-1 representing the fade envelope at the current time.
+ */
+function computeFadeMultiplier(clip: TimelineClip, playheadPosition: number): number {
+  const elapsed = playheadPosition - clip.startTime;
+  const remaining = (clip.startTime + clip.duration) - playheadPosition;
+
+  let multiplier = 1.0;
+
+  // Fade in
+  if (clip.fadeIn > 0 && elapsed < clip.fadeIn) {
+    multiplier = Math.max(0, elapsed / clip.fadeIn);
+  }
+
+  // Fade out
+  if (clip.fadeOut > 0 && remaining < clip.fadeOut) {
+    multiplier = Math.min(multiplier, Math.max(0, remaining / clip.fadeOut));
+  }
+
+  return multiplier;
+}
+
+/**
  * Manages multi-track audio playback using HTML audio elements.
  * Each audio clip on the timeline gets its own audio element,
- * synced to the playhead position.
+ * synced to the playhead position. Supports per-clip fades and per-track volume.
  */
 export function useAudioPlayback() {
   const clips = useTimelineStore((s) => s.clips);
@@ -39,12 +63,14 @@ export function useAudioPlayback() {
       const media = mediaFiles[clip.mediaFileId];
       if (!media) continue;
 
+      const track = tracks.find((t) => t.id === clip.trackId);
+      const trackVolume = track?.volume ?? 1;
+
       const clipStart = clip.startTime;
       const clipEnd = clip.startTime + clip.duration;
       const isActive = playheadPosition >= clipStart && playheadPosition < clipEnd;
 
       if (!isActive) {
-        // Pause inactive clips
         const source = sources.get(clip.id);
         if (source) {
           source.element.pause();
@@ -56,7 +82,6 @@ export function useAudioPlayback() {
 
       let source = sources.get(clip.id);
       if (!source || source.mediaFileId !== clip.mediaFileId) {
-        // Create new audio element
         if (source) {
           source.element.pause();
           source.element.src = '';
@@ -68,12 +93,14 @@ export function useAudioPlayback() {
       }
 
       const audioElement = source.element;
-      audioElement.volume = clip.volume;
+
+      // Compute final volume: clip volume * fade envelope * track master
+      const fadeMultiplier = computeFadeMultiplier(clip, playheadPosition);
+      audioElement.volume = Math.min(1, clip.volume * fadeMultiplier * trackVolume);
 
       const mediaTime = clip.mediaOffset + (playheadPosition - clipStart);
 
       if (isPlaying) {
-        // Sync position if drifted
         if (Math.abs(audioElement.currentTime - mediaTime) > 0.15) {
           audioElement.currentTime = mediaTime;
         }

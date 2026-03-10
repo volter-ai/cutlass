@@ -1,5 +1,7 @@
 import { useRef, useCallback, useState } from 'react';
+import { Link } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
+import { ClipContextMenu } from './ClipContextMenu';
 import type { TimelineClip as TClip } from '../../types';
 
 interface Props {
@@ -10,7 +12,6 @@ export function TimelineClipComponent({ clip }: Props) {
   const zoom = useTimelineStore((s) => s.zoom);
   const selectedClipIds = useTimelineStore((s) => s.selectedClipIds);
   const activeTool = useTimelineStore((s) => s.activeTool);
-  const mediaFiles = useTimelineStore((s) => s.mediaFiles);
   const {
     selectClip,
     moveClip,
@@ -18,24 +19,28 @@ export function TimelineClipComponent({ clip }: Props) {
     trimClipEnd,
     splitClipAtPlayhead,
     setPlayheadPosition,
+    setClipFade,
   } = useTimelineStore();
 
   const clipRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const dragStartRef = useRef({ x: 0, startTime: 0, duration: 0, mediaOffset: 0 });
 
   const isSelected = selectedClipIds.includes(clip.id);
-  void mediaFiles; // used for future thumbnail rendering
   const left = clip.startTime * zoom;
   const width = clip.duration * zoom;
 
   const isVideo = clip.type === 'video';
   const clipColor = isVideo ? 'var(--bg-clip-video)' : 'var(--bg-clip-audio)';
 
+  const fadeInWidth = clip.fadeIn * zoom;
+  const fadeOutWidth = clip.fadeOut * zoom;
+  const volumeY = (1 - clip.volume / 2) * 100; // percentage from top
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent, type: 'move' | 'trim-start' | 'trim-end') => {
       if (activeTool === 'razor') {
-        // Razor tool: split at click position
         const rect = clipRef.current?.getBoundingClientRect();
         if (!rect) return;
         const x = e.clientX - rect.left;
@@ -95,66 +100,173 @@ export function TimelineClipComponent({ clip }: Props) {
     [activeTool, clip, zoom, selectClip, moveClip, trimClipStart, trimClipEnd, splitClipAtPlayhead, setPlayheadPosition],
   );
 
-  return (
-    <div
-      ref={clipRef}
-      className="absolute top-0.5 bottom-0.5 flex items-center select-none group"
-      style={{
-        left,
-        width: Math.max(width, 4),
-        background: clipColor,
-        opacity: isDragging ? 0.8 : 0.9,
-        borderRadius: 3,
-        border: isSelected ? '2px solid white' : '1px solid rgba(255,255,255,0.2)',
-        cursor: activeTool === 'razor' ? 'crosshair' : isDragging ? 'grabbing' : 'grab',
-        zIndex: isSelected ? 10 : 1,
-        overflow: 'hidden',
-      }}
-    >
-      {/* Trim handle left */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:opacity-100 opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{ background: 'rgba(255,255,255,0.5)' }}
-        onMouseDown={(e) => handleMouseDown(e, 'trim-start')}
-      />
+  const handleFadeDrag = useCallback(
+    (e: React.MouseEvent, edge: 'in' | 'out') => {
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startFade = edge === 'in' ? clip.fadeIn : clip.fadeOut;
 
-      {/* Clip body */}
+      const handleMove = (moveEvent: MouseEvent) => {
+        const delta = (moveEvent.clientX - startX) / zoom;
+        const newFade = edge === 'in'
+          ? Math.max(0, startFade + delta)
+          : Math.max(0, startFade - delta);
+        setClipFade(clip.id, edge, newFade);
+      };
+
+      const handleUp = () => {
+        window.removeEventListener('mousemove', handleMove);
+        window.removeEventListener('mouseup', handleUp);
+      };
+
+      window.addEventListener('mousemove', handleMove);
+      window.addEventListener('mouseup', handleUp);
+    },
+    [clip.id, clip.fadeIn, clip.fadeOut, zoom, setClipFade],
+  );
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      selectClip(clip.id);
+      setContextMenuPos({ x: e.clientX, y: e.clientY });
+    },
+    [clip.id, selectClip],
+  );
+
+  return (
+    <>
       <div
-        className="flex-1 h-full flex items-center px-2 overflow-hidden"
-        onMouseDown={(e) => handleMouseDown(e, 'move')}
+        ref={clipRef}
+        className="absolute top-0.5 bottom-0.5 flex items-center select-none group"
+        style={{
+          left,
+          width: Math.max(width, 4),
+          background: clipColor,
+          opacity: isDragging ? 0.8 : 0.9,
+          borderRadius: 3,
+          border: isSelected ? '2px solid white' : '1px solid rgba(255,255,255,0.2)',
+          cursor: activeTool === 'razor' ? 'crosshair' : isDragging ? 'grabbing' : 'grab',
+          zIndex: isSelected ? 10 : 1,
+          overflow: 'hidden',
+        }}
+        onContextMenu={handleContextMenu}
       >
-        <span className="text-xs text-white truncate font-medium" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-          {clip.name}
-        </span>
+        {/* Fade in indicator */}
+        {fadeInWidth > 2 && (
+          <div
+            className="absolute top-0 left-0 bottom-0 pointer-events-none"
+            style={{ width: fadeInWidth }}
+          >
+            <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+              <polygon points="0,0 100,0 0,100" fill="rgba(0,0,0,0.4)" />
+              <line x1="0" y1="100" x2="100" y2="0" stroke="white" strokeWidth="2" opacity="0.6" />
+            </svg>
+          </div>
+        )}
+
+        {/* Fade out indicator */}
+        {fadeOutWidth > 2 && (
+          <div
+            className="absolute top-0 right-0 bottom-0 pointer-events-none"
+            style={{ width: fadeOutWidth }}
+          >
+            <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+              <polygon points="0,0 100,0 100,100" fill="rgba(0,0,0,0.4)" />
+              <line x1="0" y1="0" x2="100" y2="100" stroke="white" strokeWidth="2" opacity="0.6" />
+            </svg>
+          </div>
+        )}
+
+        {/* Fade in drag handle */}
+        <div
+          className="absolute top-0 left-0 w-3 h-3 cursor-ew-resize z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ background: 'rgba(255,255,255,0.7)', borderRadius: '0 0 4px 0' }}
+          onMouseDown={(e) => handleFadeDrag(e, 'in')}
+          title="Drag to set fade in"
+        />
+
+        {/* Fade out drag handle */}
+        <div
+          className="absolute top-0 right-0 w-3 h-3 cursor-ew-resize z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ background: 'rgba(255,255,255,0.7)', borderRadius: '0 0 0 4px' }}
+          onMouseDown={(e) => handleFadeDrag(e, 'out')}
+          title="Drag to set fade out"
+        />
+
+        {/* Volume rubber band line */}
+        <div
+          className="absolute left-0 right-0 pointer-events-none"
+          style={{ top: `${volumeY}%` }}
+        >
+          <div
+            className="w-full opacity-0 group-hover:opacity-60 transition-opacity"
+            style={{ height: 1, background: '#fbbf24' }}
+          />
+        </div>
+
+        {/* Linked indicator */}
+        {clip.linkedGroupId && (
+          <div className="absolute top-0.5 right-1 z-10 pointer-events-none">
+            <Link size={8} color="white" opacity={0.7} />
+          </div>
+        )}
+
+        {/* Trim handle left */}
+        <div
+          className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:opacity-100 opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ background: 'rgba(255,255,255,0.5)' }}
+          onMouseDown={(e) => handleMouseDown(e, 'trim-start')}
+        />
+
+        {/* Clip body */}
+        <div
+          className="flex-1 h-full flex items-center px-2 overflow-hidden"
+          onMouseDown={(e) => handleMouseDown(e, 'move')}
+        >
+          <span className="text-xs text-white truncate font-medium" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+            {clip.name}
+          </span>
+        </div>
+
+        {/* Trim handle right */}
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:opacity-100 opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ background: 'rgba(255,255,255,0.5)' }}
+          onMouseDown={(e) => handleMouseDown(e, 'trim-end')}
+        />
+
+        {/* Audio waveform placeholder */}
+        {!isVideo && width > 30 && (
+          <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
+            <svg viewBox="0 0 100 20" className="w-full h-3/4" preserveAspectRatio="none">
+              {Array.from({ length: 50 }).map((_, i) => {
+                const h = Math.random() * 16 + 2;
+                return (
+                  <rect
+                    key={i}
+                    x={i * 2}
+                    y={10 - h / 2}
+                    width={1.5}
+                    height={h}
+                    fill="white"
+                  />
+                );
+              })}
+            </svg>
+          </div>
+        )}
       </div>
 
-      {/* Trim handle right */}
-      <div
-        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:opacity-100 opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{ background: 'rgba(255,255,255,0.5)' }}
-        onMouseDown={(e) => handleMouseDown(e, 'trim-end')}
-      />
-
-      {/* Audio waveform placeholder */}
-      {!isVideo && width > 30 && (
-        <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
-          <svg viewBox="0 0 100 20" className="w-full h-3/4" preserveAspectRatio="none">
-            {Array.from({ length: 50 }).map((_, i) => {
-              const h = Math.random() * 16 + 2;
-              return (
-                <rect
-                  key={i}
-                  x={i * 2}
-                  y={10 - h / 2}
-                  width={1.5}
-                  height={h}
-                  fill="white"
-                />
-              );
-            })}
-          </svg>
-        </div>
+      {/* Context menu */}
+      {contextMenuPos && (
+        <ClipContextMenu
+          clipId={clip.id}
+          position={contextMenuPos}
+          onClose={() => setContextMenuPos(null)}
+        />
       )}
-    </div>
+    </>
   );
 }

@@ -99,7 +99,7 @@ export function Viewer() {
           <video
             ref={videoRef}
             className="max-w-full max-h-full object-contain"
-            muted={false}
+            muted
             playsInline
           />
         ) : (

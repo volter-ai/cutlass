@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Volume2, VolumeX, Lock, Unlock, Eye, EyeOff, Type } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { TimelineClipComponent } from './TimelineClip';
@@ -15,8 +15,9 @@ export function TimelineTrack({ track }: Props) {
   const zoom = useTimelineStore((s) => s.zoom);
   const duration = useTimelineStore((s) => s.duration);
   const activeTool = useTimelineStore((s) => s.activeTool);
-  const { toggleTrackMute, toggleTrackLock, addClipToTrack, addTextOverlay, clearSelection } =
+  const { toggleTrackMute, toggleTrackLock, setTrackVolume, addClipToTrack, addTextOverlay, clearSelection } =
     useTimelineStore();
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
 
   const trackClips = Object.values(clips)
     .filter((c) => c.trackId === track.id)
@@ -93,7 +94,7 @@ export function TimelineTrack({ track }: Props) {
     <div className="flex" style={{ height: track.height }}>
       {/* Track header */}
       <div
-        className="flex items-center gap-1 px-2 flex-shrink-0 border-r border-b"
+        className="relative flex items-center gap-1 px-2 flex-shrink-0 border-r border-b"
         style={{
           width: 100,
           background: 'var(--bg-secondary)',
@@ -121,6 +122,31 @@ export function TimelineTrack({ track }: Props) {
         >
           {track.locked ? <Lock size={11} /> : <Unlock size={11} />}
         </button>
+
+        {/* Track volume - click label to toggle slider */}
+        {!isText && (
+          <button
+            className="text-xs ml-auto"
+            style={{ color: 'var(--text-secondary)', fontSize: 9 }}
+            onClick={() => setShowVolumeSlider(!showVolumeSlider)}
+            title={`Volume: ${Math.round(track.volume * 100)}%`}
+          >
+            {Math.round(track.volume * 100)}%
+          </button>
+        )}
+
+        {/* Inline volume slider */}
+        {showVolumeSlider && !isText && (
+          <input
+            type="range"
+            min={0}
+            max={200}
+            value={Math.round(track.volume * 100)}
+            onChange={(e) => setTrackVolume(track.id, Number(e.target.value) / 100)}
+            className="absolute left-1 right-1"
+            style={{ bottom: 2, height: 3, accentColor: trackColor, zIndex: 5 }}
+          />
+        )}
       </div>
 
       {/* Track content */}

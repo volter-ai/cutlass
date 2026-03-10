@@ -12,6 +12,7 @@ export { Viewer } from './components/viewer/Viewer';
 export { Timeline } from './components/timeline/Timeline';
 export { ExportDialog } from './components/export/ExportDialog';
 export { SettingsPanel } from './components/settings/SettingsPanel';
+export { ClipContextMenu } from './components/timeline/ClipContextMenu';
 
 // Hooks (for custom integrations)
 export { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';

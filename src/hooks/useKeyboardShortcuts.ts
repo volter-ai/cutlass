@@ -80,6 +80,20 @@ export function useKeyboardShortcuts() {
           if (!isMeta) store.toggleSnap();
           break;
 
+        case 'u':
+          if (!isMeta && store.selectedClipIds.length === 1) {
+            const clipId = store.selectedClipIds[0];
+            const clip = store.clips[clipId];
+            if (clip) {
+              if (clip.linkedGroupId) {
+                store.unlinkClips(clipId);
+              } else if (clip.type === 'video') {
+                store.extractAudioFromClip(clipId);
+              }
+            }
+          }
+          break;
+
         case 'ArrowLeft':
           e.preventDefault();
           store.setPlayheadPosition(

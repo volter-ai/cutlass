@@ -218,15 +218,31 @@ export async function exportTimeline(
     overlayLabel = `[${outLabel}]`;
   });
 
-  // Audio mixing
+  // Audio mixing with fades and track volume
   let audioFilterLabel = '';
   if (settings.includeAudio && audioClips.length > 0) {
     const audioParts: string[] = [];
     audioClips.forEach((clip, i) => {
       const label = `a${i}`;
-      audioParts.push(
-        `[${clip.inputIdx}:a]atrim=start=${clip.mediaOffset}:duration=${clip.duration},asetpts=PTS-STARTPTS,adelay=${Math.round(clip.startTime * 1000)}|${Math.round(clip.startTime * 1000)},volume=${clip.volume}[${label}]`,
-      );
+      const track = tracks.find((t) => t.id === clip.trackId);
+      const trackVolume = track?.volume ?? 1;
+      const combinedVolume = clip.volume * trackVolume;
+
+      // Build audio filter chain: trim → reset pts → delay → volume → fades
+      let chain = `[${clip.inputIdx}:a]atrim=start=${clip.mediaOffset}:duration=${clip.duration},asetpts=PTS-STARTPTS,adelay=${Math.round(clip.startTime * 1000)}|${Math.round(clip.startTime * 1000)},volume=${combinedVolume}`;
+
+      // Audio fade in
+      if (clip.fadeIn > 0) {
+        chain += `,afade=t=in:d=${clip.fadeIn}`;
+      }
+
+      // Audio fade out
+      if (clip.fadeOut > 0) {
+        const fadeOutStart = clip.duration - clip.fadeOut;
+        chain += `,afade=t=out:st=${Math.max(0, fadeOutStart)}:d=${clip.fadeOut}`;
+      }
+
+      audioParts.push(`${chain}[${label}]`);
     });
     filterParts.push(...audioParts);
     const mixInputs = audioClips.map((_, i) => `[a${i}]`).join('');
