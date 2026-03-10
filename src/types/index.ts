@@ -145,3 +145,11 @@ export interface ExportSettings {
   includeAudio: boolean;
   burnCaptions: boolean;
 }
+
+export interface Project {
+  id: string;
+  name: string;
+  updatedAt: string;
+  createdAt: string;
+  thumbnail?: string;
+}

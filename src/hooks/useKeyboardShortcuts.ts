@@ -77,7 +77,12 @@ export function useKeyboardShortcuts() {
           break;
 
         case 's':
-          if (!isMeta) store.toggleSnap();
+          if (isMeta) {
+            e.preventDefault();
+            // Cmd+S: save project (handled by project persistence)
+          } else {
+            store.toggleSnap();
+          }
           break;
 
         case 'u':
@@ -120,6 +125,17 @@ export function useKeyboardShortcuts() {
           if (isMeta) {
             e.preventDefault();
             store.setZoom(store.zoom / 1.2);
+          }
+          break;
+
+        case '?':
+          store.setShowHelpOverlay(!store.showHelpOverlay);
+          break;
+
+        case 'o':
+          if (isMeta) {
+            e.preventDefault();
+            store.setShowProjectsModal(!store.showProjectsModal);
           }
           break;
       }

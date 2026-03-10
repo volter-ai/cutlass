@@ -1,7 +1,8 @@
 import { useRef, useCallback, useState } from 'react';
-import { Link } from 'lucide-react';
+import { Link, AlertTriangle } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { ClipContextMenu } from './ClipContextMenu';
+import { createMediaFile } from '../../utils/media';
 import type { TimelineClip as TClip } from '../../types';
 
 interface Props {
@@ -12,6 +13,7 @@ export function TimelineClipComponent({ clip }: Props) {
   const zoom = useTimelineStore((s) => s.zoom);
   const selectedClipIds = useTimelineStore((s) => s.selectedClipIds);
   const activeTool = useTimelineStore((s) => s.activeTool);
+  const mediaFiles = useTimelineStore((s) => s.mediaFiles);
   const {
     selectClip,
     moveClip,
@@ -20,7 +22,10 @@ export function TimelineClipComponent({ clip }: Props) {
     splitClipAtPlayhead,
     setPlayheadPosition,
     setClipFade,
+    addMediaFile,
   } = useTimelineStore();
+
+  const isMissing = !mediaFiles[clip.mediaFileId];
 
   const clipRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -135,6 +140,21 @@ export function TimelineClipComponent({ clip }: Props) {
     [clip.id, selectClip],
   );
 
+  const handleRelink = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'video/*,audio/*';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const mf = await createMediaFile(file);
+      // Override the ID to match the clip's expected mediaFileId
+      mf.id = clip.mediaFileId;
+      addMediaFile(mf);
+    };
+    input.click();
+  }, [clip.mediaFileId, addMediaFile]);
+
   return (
     <>
       <div
@@ -236,6 +256,19 @@ export function TimelineClipComponent({ clip }: Props) {
           style={{ background: 'rgba(255,255,255,0.5)' }}
           onMouseDown={(e) => handleMouseDown(e, 'trim-end')}
         />
+
+        {/* Missing media overlay */}
+        {isMissing && (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center z-30 cursor-pointer"
+            style={{ background: 'rgba(0,0,0,0.7)' }}
+            onClick={(e) => { e.stopPropagation(); handleRelink(); }}
+            title="Click to re-link media file"
+          >
+            <AlertTriangle size={12} color="#ef4444" />
+            <span className="text-xs mt-0.5" style={{ color: '#ef4444', fontSize: 9 }}>Re-link</span>
+          </div>
+        )}
 
         {/* Audio waveform placeholder */}
         {!isVideo && width > 30 && (

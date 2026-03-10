@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="tri5" x1="0" y1="0" x2="1" y2="0.5">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="60%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="edge5" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e2e8f0"/>
+      <stop offset="50%" stop-color="#c7d2fe"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <filter id="glow5">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow5">
+      <feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#6366f1" flood-opacity="0.4"/>
+    </filter>
+    <clipPath id="triClip">
+      <path d="M 130 96 L 400 256 L 130 416 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="80" fill="#1a1a2e"/>
+
+  <g filter="url(#shadow5)">
+    <!-- Play triangle base -->
+    <path d="
+      M 130 96
+      L 130 416
+      L 400 256
+      Z
+    " fill="url(#tri5)"/>
+
+    <!-- Cutlass blade edge replacing the right side of the triangle -->
+    <g filter="url(#glow5)">
+      <path d="
+        M 400 256
+        C 396 246, 388 230, 375 210
+        C 350 172, 300 130, 260 114
+        C 220 98, 170 96, 140 96
+        L 130 96
+        L 400 256
+        Z
+      " fill="url(#tri5)"/>
+
+      <!-- Upper blade edge with curve -->
+      <path d="
+        M 130 96
+        C 170 96, 220 98, 260 114
+        C 300 130, 350 172, 375 210
+        C 388 230, 396 246, 400 256
+      " fill="none" stroke="url(#edge5)" stroke-width="3" stroke-linecap="round"/>
+
+      <!-- Lower blade edge with curve -->
+      <path d="
+        M 400 256
+        C 396 266, 388 282, 375 302
+        C 350 340, 300 382, 260 398
+        C 220 414, 170 416, 140 416
+        L 130 416
+        L 400 256
+        Z
+      " fill="url(#tri5)"/>
+
+      <path d="
+        M 130 416
+        C 170 416, 220 414, 260 398
+        C 300 382, 350 340, 375 302
+        C 388 282, 396 266, 400 256
+      " fill="none" stroke="url(#edge5)" stroke-width="3" stroke-linecap="round"/>
+    </g>
+
+    <!-- Blade glint near the tip -->
+    <path d="
+      M 380 248
+      C 385 250, 392 253, 398 256
+      C 392 259, 385 262, 380 264
+    " fill="white" opacity="0.5"/>
+
+    <!-- Inner bevel line -->
+    <path d="
+      M 160 130
+      L 360 256
+      L 160 382
+    " fill="none" stroke="#4338ca" stroke-width="1" opacity="0.3"/>
+  </g>
+</svg>

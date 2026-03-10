@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="blade4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="50%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="edge4" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#c7d2fe"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+    <linearGradient id="hilt4" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#94a3b8"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+    <filter id="glow4">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow4">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#6366f1" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="80" fill="#1a1a2e"/>
+
+  <!-- The "C" shaped cutlass blade -->
+  <g filter="url(#shadow4)">
+    <!-- Main C blade shape - thick curved blade -->
+    <path d="
+      M 340 120
+      C 330 108, 300 80, 240 72
+      C 180 64, 120 100, 100 160
+      C 80 220, 80 290, 100 350
+      C 120 410, 180 448, 240 440
+      C 300 432, 330 404, 340 392
+      L 320 380
+      C 312 390, 288 412, 244 418
+      C 196 426, 148 390, 132 340
+      C 116 296, 116 216, 132 172
+      C 148 124, 196 88, 244 94
+      C 288 100, 312 122, 320 132
+      Z
+    " fill="url(#blade4)"/>
+
+    <!-- Blade edge highlight (outer edge of C) -->
+    <path d="
+      M 340 120
+      C 330 108, 300 80, 240 72
+      C 180 64, 120 100, 100 160
+      C 80 220, 80 290, 100 350
+      C 120 410, 180 448, 240 440
+      C 300 432, 330 404, 340 392
+    " fill="none" stroke="#c7d2fe" stroke-width="2" opacity="0.8"/>
+
+    <!-- Top crossguard / hilt tip -->
+    <rect x="328" y="108" width="40" height="14" rx="7" fill="url(#hilt4)" transform="rotate(-15, 348, 115)"/>
+
+    <!-- Bottom crossguard / hilt tip -->
+    <rect x="328" y="382" width="40" height="14" rx="7" fill="url(#hilt4)" transform="rotate(15, 348, 389)"/>
+
+    <!-- Inner blade bevel -->
+    <path d="
+      M 320 132
+      C 312 122, 288 104, 248 100
+      C 200 94, 154 128, 138 172
+      C 122 220, 122 296, 138 340
+      C 154 386, 200 420, 248 414
+      C 288 408, 312 390, 320 380
+    " fill="none" stroke="#4338ca" stroke-width="1" opacity="0.5"/>
+  </g>
+</svg>

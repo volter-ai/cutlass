@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="blade2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="40%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <linearGradient id="hilt2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="edge2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#fca5a5" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ef4444" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow2">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="80" fill="#1a1a2e"/>
+
+  <!-- Subtle timeline lines in background -->
+  <rect x="80" y="160" width="352" height="2" rx="1" fill="#334155" opacity="0.5"/>
+  <rect x="80" y="256" width="352" height="2" rx="1" fill="#334155" opacity="0.5"/>
+  <rect x="80" y="352" width="352" height="2" rx="1" fill="#334155" opacity="0.5"/>
+
+  <!-- Blade - vertical cutlass as playhead line -->
+  <g filter="url(#glow2)">
+    <!-- Main blade body -->
+    <path d="
+      M 256 56
+      C 256 56, 262 80, 264 120
+      C 268 200, 270 280, 266 340
+      C 264 360, 260 370, 256 375
+      C 252 370, 248 360, 246 340
+      C 242 280, 244 200, 248 120
+      C 250 80, 256 56, 256 56
+    " fill="url(#blade2)"/>
+
+    <!-- Blade edge highlight -->
+    <path d="
+      M 256 56
+      C 256 56, 262 80, 264 120
+      C 268 200, 270 280, 266 340
+      C 264 360, 260 370, 256 375
+    " fill="none" stroke="#fca5a5" stroke-width="1.5" opacity="0.7"/>
+
+    <!-- Blade tip -->
+    <path d="
+      M 256 46
+      L 260 56
+      C 260 56, 256 52, 252 56
+      Z
+    " fill="#fca5a5"/>
+  </g>
+
+  <!-- Crossguard / hilt -->
+  <rect x="220" y="375" width="72" height="12" rx="6" fill="url(#hilt2)"/>
+
+  <!-- Grip -->
+  <rect x="246" y="387" width="20" height="52" rx="4" fill="#4f46e5"/>
+
+  <!-- Grip wrap details -->
+  <path d="M 248 395 L 264 400" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
+  <path d="M 248 407 L 264 412" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
+  <path d="M 248 419 L 264 424" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Pommel -->
+  <circle cx="256" cy="448" r="12" fill="url(#hilt2)"/>
+  <circle cx="256" cy="448" r="5" fill="#1a1a2e"/>
+</svg>

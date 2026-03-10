@@ -3,6 +3,7 @@
 
 // Provider (wraps panels with store context)
 export { CutlassProvider } from './CutlassProvider';
+export { AuthProvider, useAuth } from './context/AuthProvider';
 
 // Individual panels (can be mounted into dockview or any layout system)
 export { Toolbar } from './components/toolbar/Toolbar';
@@ -13,6 +14,10 @@ export { Timeline } from './components/timeline/Timeline';
 export { ExportDialog } from './components/export/ExportDialog';
 export { SettingsPanel } from './components/settings/SettingsPanel';
 export { ClipContextMenu } from './components/timeline/ClipContextMenu';
+export { HelpOverlay } from './components/help/HelpOverlay';
+export { ProjectsModal } from './components/projects/ProjectsModal';
+export { AuthModal } from './components/auth/AuthModal';
+export { UserMenu } from './components/auth/UserMenu';
 
 // Hooks (for custom integrations)
 export { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -35,6 +40,23 @@ export type {
 // Services
 export { transcribeMedia } from './services/transcription';
 export { exportTimeline, downloadBlob } from './services/export';
+export { supabase, isSupabaseConfigured } from './services/supabase';
+export {
+  listProjects,
+  createProject,
+  saveProject,
+  loadProject,
+  deleteProject,
+  renameProject,
+  serializeProject,
+  deserializeProject,
+} from './services/projects';
+export {
+  storeMediaFile,
+  getMediaFile,
+  removeMediaFile as removeStoredMedia,
+  listStoredMediaIds,
+} from './services/mediaStorage';
 
 // Types
 export type {
@@ -54,6 +76,7 @@ export type {
   AspectRatio,
   ProjectSettings,
   ExportSettings,
+  Project,
 } from './types';
 export { ASPECT_RATIO_DIMENSIONS } from './types';
 

@@ -12,9 +12,12 @@ import {
   ZoomOut,
   Download,
   Magnet,
+  HelpCircle,
+  FolderOpen,
 } from 'lucide-react';
 import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { formatTimecode } from '../../utils/time';
+import { UserMenu } from '../auth/UserMenu';
 import type { Tool } from '../../types';
 
 export function Toolbar() {
@@ -31,7 +34,11 @@ export function Toolbar() {
     snapEnabled,
     toggleSnap,
     setShowExportDialog,
+    setShowHelpOverlay,
+    setShowProjectsModal,
     settings,
+    currentProjectName,
+    projectSaved,
   } = useTimelineStore();
 
   const storeApi = useTimelineStoreApi();
@@ -45,12 +52,29 @@ export function Toolbar() {
 
   return (
     <div className="flex items-center h-10 px-3 gap-2 border-b" style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}>
-      {/* App Title */}
-      <div className="flex items-center gap-2 mr-4">
+      {/* App Title + Project Name */}
+      <div className="flex items-center gap-2 mr-2">
         <span className="text-sm font-bold tracking-wider" style={{ color: 'var(--accent)' }}>
           CUTLASS
         </span>
+        <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+          /
+        </span>
+        <span className="text-xs truncate max-w-32" style={{ color: 'var(--text-primary)' }}>
+          {currentProjectName}
+          {!projectSaved && <span style={{ color: 'var(--playhead)' }}> *</span>}
+        </span>
       </div>
+
+      {/* Projects */}
+      <button
+        onClick={() => setShowProjectsModal(true)}
+        className="p-1.5 rounded transition-colors hover:opacity-80"
+        style={{ color: 'var(--text-secondary)' }}
+        title="Projects (Cmd+O)"
+      >
+        <FolderOpen size={14} />
+      </button>
 
       {/* Divider */}
       <div className="w-px h-6" style={{ background: 'var(--border)' }} />
@@ -199,6 +223,22 @@ export function Toolbar() {
           <ZoomIn size={14} />
         </button>
       </div>
+
+      {/* Divider */}
+      <div className="w-px h-6" style={{ background: 'var(--border)' }} />
+
+      {/* Help */}
+      <button
+        onClick={() => setShowHelpOverlay(true)}
+        className="p-1.5 rounded transition-colors hover:opacity-80"
+        style={{ color: 'var(--text-secondary)' }}
+        title="Help (?)"
+      >
+        <HelpCircle size={14} />
+      </button>
+
+      {/* User Menu */}
+      <UserMenu />
     </div>
   );
 }

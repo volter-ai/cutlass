@@ -23,11 +23,12 @@
 - [x] **Per-track volume** - Master fader per track (click % label to toggle slider)
 - [x] **Linked clip behavior** - Video transitions auto-apply matching audio fades to linked audio
 
-## Upcoming
+## Onboarding & Persistence
 
-- [ ] **Onboarding / Tutorials** - Interactive walkthrough for new users: import media, arrange on timeline, cut/trim, transcribe, remove fillers, export. Tooltip-based or overlay-based guided tour.
-- [ ] **Projects & file management** - Save/load projects, organize media across multiple editing sessions
-- [ ] **User accounts** - Auth layer so users can privately manage their own files and projects across devices
+- [x] **Help panel / cheat sheet** - Keyboard shortcuts overlay + quick start guide, triggered by ? key or help button
+- [x] **User accounts** - Supabase auth (email/password sign in/up/out), toolbar user menu, graceful degradation without Supabase
+- [x] **Projects & file management** - Save/load projects to Supabase Postgres, project list modal (Cmd+O), project name in toolbar
+- [x] **Client-side media persistence** - IndexedDB storage for imported media files, auto-recovery on project load, re-link UI for missing media
 
 ## Nice-to-Have Polish (Later)
 

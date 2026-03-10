@@ -80,6 +80,13 @@ export interface TimelineState {
   // UI
   leftPanelTab: 'media' | 'transcript' | 'settings';
   showExportDialog: boolean;
+  showHelpOverlay: boolean;
+  showProjectsModal: boolean;
+
+  // Project persistence
+  currentProjectId: string | null;
+  currentProjectName: string;
+  projectSaved: boolean;
 
   // Actions - Media
   addMediaFile: (file: MediaFile) => void;
@@ -148,6 +155,13 @@ export interface TimelineState {
 
   // Actions - UI
   setLeftPanelTab: (tab: 'media' | 'transcript' | 'settings') => void;
+  setShowHelpOverlay: (show: boolean) => void;
+  setShowProjectsModal: (show: boolean) => void;
+
+  // Actions - Project
+  setCurrentProject: (id: string | null, name: string) => void;
+  markProjectSaved: () => void;
+  markProjectDirty: () => void;
 
   // Computed
   getClipsForTrack: (trackId: string) => TimelineClip[];
@@ -208,16 +222,31 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         exportProgress: 0,
         leftPanelTab: 'media' as const,
         showExportDialog: false,
+        showHelpOverlay: false,
+        showProjectsModal: false,
+        currentProjectId: null,
+        currentProjectName: 'Untitled Project',
+        projectSaved: true,
 
-        addMediaFile: (file) =>
+        addMediaFile: (file) => {
           set((state) => {
             state.mediaFiles[file.id] = file;
-          }),
+          });
+          // Persist to IndexedDB (fire-and-forget)
+          import('../services/mediaStorage').then((ms) =>
+            ms.storeMediaFile(file.id, file.file).catch(() => {}),
+          );
+        },
 
-        removeMediaFile: (id) =>
+        removeMediaFile: (id) => {
           set((state) => {
             delete state.mediaFiles[id];
-          }),
+          });
+          // Remove from IndexedDB (fire-and-forget)
+          import('../services/mediaStorage').then((ms) =>
+            ms.removeMediaFile(id).catch(() => {}),
+          );
+        },
 
         addClipToTrack: (mediaFileId, trackId, startTime, mediaOffset = 0, duration?) => {
           const clipId = uuid();
@@ -717,6 +746,33 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         setLeftPanelTab: (tab) =>
           set((state) => {
             state.leftPanelTab = tab;
+          }),
+
+        setShowHelpOverlay: (show) =>
+          set((state) => {
+            state.showHelpOverlay = show;
+          }),
+
+        setShowProjectsModal: (show) =>
+          set((state) => {
+            state.showProjectsModal = show;
+          }),
+
+        setCurrentProject: (id, name) =>
+          set((state) => {
+            state.currentProjectId = id;
+            state.currentProjectName = name;
+            state.projectSaved = true;
+          }),
+
+        markProjectSaved: () =>
+          set((state) => {
+            state.projectSaved = true;
+          }),
+
+        markProjectDirty: () =>
+          set((state) => {
+            state.projectSaved = false;
           }),
 
         getClipsForTrack: (trackId) =>

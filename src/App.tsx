@@ -5,6 +5,8 @@ import { SettingsPanel } from './components/settings/SettingsPanel';
 import { Viewer } from './components/viewer/Viewer';
 import { Timeline } from './components/timeline/Timeline';
 import { ExportDialog } from './components/export/ExportDialog';
+import { HelpOverlay } from './components/help/HelpOverlay';
+import { ProjectsModal } from './components/projects/ProjectsModal';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { usePlayback } from './hooks/usePlayback';
 import { useAudioPlayback } from './hooks/useAudioPlayback';
@@ -72,8 +74,10 @@ export default function App() {
         </div>
       </div>
 
-      {/* Export Dialog (modal) */}
+      {/* Modals */}
       <ExportDialog />
+      <HelpOverlay />
+      <ProjectsModal />
     </div>
   );
 }
