@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { useTimelineStore } from '../store/timeline';
+import { useTimelineStore, useTimelineStoreApi } from '../store/timeline';
 
 export function useKeyboardShortcuts() {
   const store = useTimelineStore();
+  const storeApi = useTimelineStoreApi();
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -54,7 +55,7 @@ export function useKeyboardShortcuts() {
         case 'z':
           if (isMeta) {
             e.preventDefault();
-            const temporal = useTimelineStore.temporal.getState();
+            const temporal = storeApi.temporal.getState();
             if (e.shiftKey) {
               temporal.redo();
             } else {
@@ -104,5 +105,5 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [store]);
+  }, [store, storeApi]);
 }

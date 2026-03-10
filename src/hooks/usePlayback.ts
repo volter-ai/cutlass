@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { useTimelineStore } from '../store/timeline';
+import { useTimelineStore, useTimelineStoreApi } from '../store/timeline';
 
 export function usePlayback() {
   const isPlaying = useTimelineStore((s) => s.isPlaying);
   const setPlayheadPosition = useTimelineStore((s) => s.setPlayheadPosition);
   const setIsPlaying = useTimelineStore((s) => s.setIsPlaying);
+  const storeApi = useTimelineStoreApi();
   const lastFrameRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
 
@@ -20,7 +21,7 @@ export function usePlayback() {
       const delta = (now - lastFrameRef.current) / 1000;
       lastFrameRef.current = now;
 
-      const state = useTimelineStore.getState();
+      const state = storeApi.getState();
       const newPosition = state.playheadPosition + delta;
 
       if (newPosition >= state.duration) {
@@ -38,5 +39,5 @@ export function usePlayback() {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [isPlaying, setPlayheadPosition, setIsPlaying]);
+  }, [isPlaying, setPlayheadPosition, setIsPlaying, storeApi]);
 }

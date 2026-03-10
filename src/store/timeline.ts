@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react';
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
@@ -12,7 +13,7 @@ import type {
   FillerRemovalMode,
 } from '../types';
 
-interface TimelineState {
+export interface TimelineState {
   // Media
   mediaFiles: Record<string, MediaFile>;
 
@@ -85,6 +86,8 @@ interface TimelineState {
   recalculateDuration: () => void;
 }
 
+export type TimelineStore = ReturnType<typeof createTimelineStore>;
+
 const DEFAULT_TRACKS: Track[] = [
   { id: 'v2', type: 'video', name: 'V2', muted: false, locked: false, height: 60 },
   { id: 'v1', type: 'video', name: 'V1', muted: false, locked: false, height: 60 },
@@ -92,373 +95,418 @@ const DEFAULT_TRACKS: Track[] = [
   { id: 'a2', type: 'audio', name: 'A2', muted: false, locked: false, height: 50 },
 ];
 
-export const useTimelineStore = create<TimelineState>()(
-  temporal(
-    immer((set, get) => ({
-      mediaFiles: {},
-      tracks: DEFAULT_TRACKS,
-      clips: {},
-      playheadPosition: 0,
-      isPlaying: false,
-      duration: 0,
-      zoom: 100,
-      selectedClipIds: [],
-      activeTool: 'select' as Tool,
-      transcripts: {},
-      activeTranscriptMediaId: null,
-      leftPanelTab: 'media' as const,
+export interface TimelineStoreOptions {
+  initialTracks?: Track[];
+  initialMediaFiles?: Record<string, MediaFile>;
+}
 
-      addMediaFile: (file) =>
-        set((state) => {
-          state.mediaFiles[file.id] = file;
-        }),
+export function createTimelineStore(options?: TimelineStoreOptions) {
+  return create<TimelineState>()(
+    temporal(
+      immer((set, get) => ({
+        mediaFiles: options?.initialMediaFiles ?? {},
+        tracks: options?.initialTracks ?? DEFAULT_TRACKS,
+        clips: {},
+        playheadPosition: 0,
+        isPlaying: false,
+        duration: 0,
+        zoom: 100,
+        selectedClipIds: [],
+        activeTool: 'select' as Tool,
+        transcripts: {},
+        activeTranscriptMediaId: null,
+        leftPanelTab: 'media' as const,
 
-      removeMediaFile: (id) =>
-        set((state) => {
-          delete state.mediaFiles[id];
-        }),
+        addMediaFile: (file) =>
+          set((state) => {
+            state.mediaFiles[file.id] = file;
+          }),
 
-      addClipToTrack: (mediaFileId, trackId, startTime, mediaOffset = 0, duration?) => {
-        const clipId = uuid();
-        const mediaFile = get().mediaFiles[mediaFileId];
-        if (!mediaFile) return clipId;
+        removeMediaFile: (id) =>
+          set((state) => {
+            delete state.mediaFiles[id];
+          }),
 
-        const clipDuration = duration ?? mediaFile.duration - mediaOffset;
-        set((state) => {
-          state.clips[clipId] = {
-            id: clipId,
-            mediaFileId,
-            trackId,
-            startTime,
-            duration: clipDuration,
-            mediaOffset,
-            name: mediaFile.name,
-            type: mediaFile.type === 'audio' ? 'audio' : 'video',
-          };
-        });
-        get().recalculateDuration();
-        return clipId;
-      },
+        addClipToTrack: (mediaFileId, trackId, startTime, mediaOffset = 0, duration?) => {
+          const clipId = uuid();
+          const mediaFile = get().mediaFiles[mediaFileId];
+          if (!mediaFile) return clipId;
 
-      removeClip: (clipId) =>
-        set((state) => {
-          delete state.clips[clipId];
-          state.selectedClipIds = state.selectedClipIds.filter((id) => id !== clipId);
-        }),
-
-      moveClip: (clipId, newStartTime, newTrackId) =>
-        set((state) => {
-          const clip = state.clips[clipId];
-          if (!clip) return;
-          clip.startTime = Math.max(0, newStartTime);
-          if (newTrackId) clip.trackId = newTrackId;
-        }),
-
-      trimClipStart: (clipId, newStartTime) =>
-        set((state) => {
-          const clip = state.clips[clipId];
-          if (!clip) return;
-          const delta = newStartTime - clip.startTime;
-          clip.mediaOffset += delta;
-          clip.duration -= delta;
-          clip.startTime = newStartTime;
-        }),
-
-      trimClipEnd: (clipId, newEndTime) =>
-        set((state) => {
-          const clip = state.clips[clipId];
-          if (!clip) return;
-          clip.duration = newEndTime - clip.startTime;
-        }),
-
-      splitClipAtPlayhead: (clipId) =>
-        set((state) => {
-          const clip = state.clips[clipId];
-          if (!clip) return;
-          const playhead = state.playheadPosition;
-          if (playhead <= clip.startTime || playhead >= clip.startTime + clip.duration) return;
-
-          const splitPoint = playhead - clip.startTime;
-          const newClipId = uuid();
-
-          state.clips[newClipId] = {
-            id: newClipId,
-            mediaFileId: clip.mediaFileId,
-            trackId: clip.trackId,
-            startTime: playhead,
-            duration: clip.duration - splitPoint,
-            mediaOffset: clip.mediaOffset + splitPoint,
-            name: clip.name,
-            type: clip.type,
-          };
-
-          clip.duration = splitPoint;
-        }),
-
-      rippleDelete: (clipId) =>
-        set((state) => {
-          const clip = state.clips[clipId];
-          if (!clip) return;
-          const trackId = clip.trackId;
-          const clipEnd = clip.startTime + clip.duration;
-          const gap = clip.duration;
-
-          delete state.clips[clipId];
-          state.selectedClipIds = state.selectedClipIds.filter((id) => id !== clipId);
-
-          // Shift subsequent clips on the same track
-          Object.values(state.clips).forEach((c) => {
-            if (c.trackId === trackId && c.startTime >= clipEnd) {
-              c.startTime -= gap;
-            }
+          const clipDuration = duration ?? mediaFile.duration - mediaOffset;
+          set((state) => {
+            state.clips[clipId] = {
+              id: clipId,
+              mediaFileId,
+              trackId,
+              startTime,
+              duration: clipDuration,
+              mediaOffset,
+              name: mediaFile.name,
+              type: mediaFile.type === 'audio' ? 'audio' : 'video',
+            };
           });
-        }),
+          get().recalculateDuration();
+          return clipId;
+        },
 
-      addTrack: (type) => {
-        const trackId = uuid();
-        set((state) => {
-          const trackNum =
-            state.tracks.filter((t) => t.type === type).length + 1;
-          const track: Track = {
-            id: trackId,
-            type,
-            name: `${type === 'video' ? 'V' : 'A'}${trackNum}`,
-            muted: false,
-            locked: false,
-            height: type === 'video' ? 60 : 50,
-          };
-          if (type === 'video') {
-            state.tracks.unshift(track);
-          } else {
-            state.tracks.push(track);
-          }
-        });
-        return trackId;
-      },
+        removeClip: (clipId) =>
+          set((state) => {
+            delete state.clips[clipId];
+            state.selectedClipIds = state.selectedClipIds.filter((id) => id !== clipId);
+          }),
 
-      removeTrack: (trackId) =>
-        set((state) => {
-          state.tracks = state.tracks.filter((t) => t.id !== trackId);
-          Object.keys(state.clips).forEach((clipId) => {
-            if (state.clips[clipId].trackId === trackId) {
-              delete state.clips[clipId];
-            }
-          });
-        }),
+        moveClip: (clipId, newStartTime, newTrackId) =>
+          set((state) => {
+            const clip = state.clips[clipId];
+            if (!clip) return;
+            clip.startTime = Math.max(0, newStartTime);
+            if (newTrackId) clip.trackId = newTrackId;
+          }),
 
-      toggleTrackMute: (trackId) =>
-        set((state) => {
-          const track = state.tracks.find((t) => t.id === trackId);
-          if (track) track.muted = !track.muted;
-        }),
+        trimClipStart: (clipId, newStartTime) =>
+          set((state) => {
+            const clip = state.clips[clipId];
+            if (!clip) return;
+            const delta = newStartTime - clip.startTime;
+            clip.mediaOffset += delta;
+            clip.duration -= delta;
+            clip.startTime = newStartTime;
+          }),
 
-      toggleTrackLock: (trackId) =>
-        set((state) => {
-          const track = state.tracks.find((t) => t.id === trackId);
-          if (track) track.locked = !track.locked;
-        }),
+        trimClipEnd: (clipId, newEndTime) =>
+          set((state) => {
+            const clip = state.clips[clipId];
+            if (!clip) return;
+            clip.duration = newEndTime - clip.startTime;
+          }),
 
-      setPlayheadPosition: (time) =>
-        set((state) => {
-          state.playheadPosition = Math.max(0, time);
-        }),
+        splitClipAtPlayhead: (clipId) =>
+          set((state) => {
+            const clip = state.clips[clipId];
+            if (!clip) return;
+            const playhead = state.playheadPosition;
+            if (playhead <= clip.startTime || playhead >= clip.startTime + clip.duration) return;
 
-      setIsPlaying: (playing) =>
-        set((state) => {
-          state.isPlaying = playing;
-        }),
+            const splitPoint = playhead - clip.startTime;
+            const newClipId = uuid();
 
-      setZoom: (zoom) =>
-        set((state) => {
-          state.zoom = Math.max(10, Math.min(500, zoom));
-        }),
+            state.clips[newClipId] = {
+              id: newClipId,
+              mediaFileId: clip.mediaFileId,
+              trackId: clip.trackId,
+              startTime: playhead,
+              duration: clip.duration - splitPoint,
+              mediaOffset: clip.mediaOffset + splitPoint,
+              name: clip.name,
+              type: clip.type,
+            };
 
-      selectClip: (clipId, multi = false) =>
-        set((state) => {
-          if (multi) {
-            if (state.selectedClipIds.includes(clipId)) {
-              state.selectedClipIds = state.selectedClipIds.filter((id) => id !== clipId);
-            } else {
-              state.selectedClipIds.push(clipId);
-            }
-          } else {
-            state.selectedClipIds = [clipId];
-          }
-        }),
+            clip.duration = splitPoint;
+          }),
 
-      clearSelection: () =>
-        set((state) => {
-          state.selectedClipIds = [];
-        }),
+        rippleDelete: (clipId) =>
+          set((state) => {
+            const clip = state.clips[clipId];
+            if (!clip) return;
+            const trackId = clip.trackId;
+            const clipEnd = clip.startTime + clip.duration;
+            const gap = clip.duration;
 
-      setActiveTool: (tool) =>
-        set((state) => {
-          state.activeTool = tool;
-        }),
+            delete state.clips[clipId];
+            state.selectedClipIds = state.selectedClipIds.filter((id) => id !== clipId);
 
-      setTranscript: (mediaFileId, transcript) =>
-        set((state) => {
-          state.transcripts[mediaFileId] = transcript;
-        }),
-
-      setActiveTranscriptMediaId: (id) =>
-        set((state) => {
-          state.activeTranscriptMediaId = id;
-        }),
-
-      removeFillerWords: (mediaFileId, mode) =>
-        set((state) => {
-          const transcript = state.transcripts[mediaFileId];
-          if (!transcript) return;
-
-          transcript.segments.forEach((segment) => {
-            segment.words.forEach((word) => {
-              if (!word.isFiller) return;
-
-              switch (mode) {
-                case 'delete':
-                  word.isRemoved = true;
-                  break;
-                case 'gap':
-                  // Mark as removed but keep timing (creates silence)
-                  word.isRemoved = true;
-                  break;
-                case 'ignore':
-                  // Keep in audio but mark visually
-                  word.isRemoved = false;
-                  break;
-                case 'transcript-only':
-                  // Remove from transcript display only
-                  word.isRemoved = true;
-                  break;
+            // Shift subsequent clips on the same track
+            Object.values(state.clips).forEach((c) => {
+              if (c.trackId === trackId && c.startTime >= clipEnd) {
+                c.startTime -= gap;
               }
             });
-          });
+          }),
 
-          // For 'delete' mode, create edit points on the timeline
-          if (mode === 'delete') {
-            const fillerRegions: { start: number; end: number }[] = [];
+        addTrack: (type) => {
+          const trackId = uuid();
+          set((state) => {
+            const trackNum =
+              state.tracks.filter((t) => t.type === type).length + 1;
+            const track: Track = {
+              id: trackId,
+              type,
+              name: `${type === 'video' ? 'V' : 'A'}${trackNum}`,
+              muted: false,
+              locked: false,
+              height: type === 'video' ? 60 : 50,
+            };
+            if (type === 'video') {
+              state.tracks.unshift(track);
+            } else {
+              state.tracks.push(track);
+            }
+          });
+          return trackId;
+        },
+
+        removeTrack: (trackId) =>
+          set((state) => {
+            state.tracks = state.tracks.filter((t) => t.id !== trackId);
+            Object.keys(state.clips).forEach((clipId) => {
+              if (state.clips[clipId].trackId === trackId) {
+                delete state.clips[clipId];
+              }
+            });
+          }),
+
+        toggleTrackMute: (trackId) =>
+          set((state) => {
+            const track = state.tracks.find((t) => t.id === trackId);
+            if (track) track.muted = !track.muted;
+          }),
+
+        toggleTrackLock: (trackId) =>
+          set((state) => {
+            const track = state.tracks.find((t) => t.id === trackId);
+            if (track) track.locked = !track.locked;
+          }),
+
+        setPlayheadPosition: (time) =>
+          set((state) => {
+            state.playheadPosition = Math.max(0, time);
+          }),
+
+        setIsPlaying: (playing) =>
+          set((state) => {
+            state.isPlaying = playing;
+          }),
+
+        setZoom: (zoom) =>
+          set((state) => {
+            state.zoom = Math.max(10, Math.min(500, zoom));
+          }),
+
+        selectClip: (clipId, multi = false) =>
+          set((state) => {
+            if (multi) {
+              if (state.selectedClipIds.includes(clipId)) {
+                state.selectedClipIds = state.selectedClipIds.filter((id) => id !== clipId);
+              } else {
+                state.selectedClipIds.push(clipId);
+              }
+            } else {
+              state.selectedClipIds = [clipId];
+            }
+          }),
+
+        clearSelection: () =>
+          set((state) => {
+            state.selectedClipIds = [];
+          }),
+
+        setActiveTool: (tool) =>
+          set((state) => {
+            state.activeTool = tool;
+          }),
+
+        setTranscript: (mediaFileId, transcript) =>
+          set((state) => {
+            state.transcripts[mediaFileId] = transcript;
+          }),
+
+        setActiveTranscriptMediaId: (id) =>
+          set((state) => {
+            state.activeTranscriptMediaId = id;
+          }),
+
+        removeFillerWords: (mediaFileId, mode) =>
+          set((state) => {
+            const transcript = state.transcripts[mediaFileId];
+            if (!transcript) return;
+
             transcript.segments.forEach((segment) => {
               segment.words.forEach((word) => {
-                if (word.isFiller && word.isRemoved) {
-                  fillerRegions.push({ start: word.start, end: word.end });
+                if (!word.isFiller) return;
+
+                switch (mode) {
+                  case 'delete':
+                    word.isRemoved = true;
+                    break;
+                  case 'gap':
+                    // Mark as removed but keep timing (creates silence)
+                    word.isRemoved = true;
+                    break;
+                  case 'ignore':
+                    // Keep in audio but mark visually
+                    word.isRemoved = false;
+                    break;
+                  case 'transcript-only':
+                    // Remove from transcript display only
+                    word.isRemoved = true;
+                    break;
                 }
               });
             });
 
-            // Find clips that use this media file and split around fillers
-            const clipsForMedia = Object.values(state.clips).filter(
-              (c) => c.mediaFileId === mediaFileId,
-            );
-
-            fillerRegions.reverse().forEach((region) => {
-              clipsForMedia.forEach((clip) => {
-                const clipEnd = clip.startTime + clip.duration;
-                const regionStartInClip = region.start - clip.mediaOffset + clip.startTime;
-                const regionEndInClip = region.end - clip.mediaOffset + clip.startTime;
-
-                if (regionStartInClip > clip.startTime && regionEndInClip < clipEnd) {
-                  // Split and remove the filler region
-                  const newClipId = uuid();
-                  const fillerDuration = region.end - region.start;
-
-                  state.clips[newClipId] = {
-                    id: newClipId,
-                    mediaFileId: clip.mediaFileId,
-                    trackId: clip.trackId,
-                    startTime: regionStartInClip,
-                    duration: clipEnd - regionEndInClip,
-                    mediaOffset: clip.mediaOffset + (regionEndInClip - clip.startTime),
-                    name: clip.name,
-                    type: clip.type,
-                  };
-
-                  clip.duration = regionStartInClip - clip.startTime;
-
-                  // Shift the new clip to close the gap
-                  state.clips[newClipId].startTime -= fillerDuration;
-                }
+            // For 'delete' mode, create edit points on the timeline
+            if (mode === 'delete') {
+              const fillerRegions: { start: number; end: number }[] = [];
+              transcript.segments.forEach((segment) => {
+                segment.words.forEach((word) => {
+                  if (word.isFiller && word.isRemoved) {
+                    fillerRegions.push({ start: word.start, end: word.end });
+                  }
+                });
               });
-            });
-          }
-        }),
 
-      detectScenes: (mediaFileId) =>
-        set((state) => {
-          const transcript = state.transcripts[mediaFileId];
-          if (!transcript) return;
+              // Find clips that use this media file and split around fillers
+              const clipsForMedia = Object.values(state.clips).filter(
+                (c) => c.mediaFileId === mediaFileId,
+              );
 
-          // Detect scenes based on long pauses between segments and speaker changes
-          const scenes: Scene[] = [];
-          let currentScene: Scene | null = null;
+              fillerRegions.reverse().forEach((region) => {
+                clipsForMedia.forEach((clip) => {
+                  const clipEnd = clip.startTime + clip.duration;
+                  const regionStartInClip = region.start - clip.mediaOffset + clip.startTime;
+                  const regionEndInClip = region.end - clip.mediaOffset + clip.startTime;
 
-          transcript.segments.forEach((segment, i) => {
-            const prevSegment = i > 0 ? transcript.segments[i - 1] : null;
-            const gapFromPrev = prevSegment ? segment.start - prevSegment.end : 0;
-            const speakerChanged = prevSegment && prevSegment.speaker !== segment.speaker;
+                  if (regionStartInClip > clip.startTime && regionEndInClip < clipEnd) {
+                    // Split and remove the filler region
+                    const newClipId = uuid();
+                    const fillerDuration = region.end - region.start;
 
-            // Start new scene on: first segment, long pause (>2s), or speaker change
-            if (!currentScene || gapFromPrev > 2 || speakerChanged) {
-              if (currentScene) {
-                scenes.push(currentScene);
-              }
-              currentScene = {
-                id: uuid(),
-                name: `Scene ${scenes.length + 1}`,
-                start: segment.start,
-                end: segment.end,
-                clipIds: [],
-              };
+                    state.clips[newClipId] = {
+                      id: newClipId,
+                      mediaFileId: clip.mediaFileId,
+                      trackId: clip.trackId,
+                      startTime: regionStartInClip,
+                      duration: clipEnd - regionEndInClip,
+                      mediaOffset: clip.mediaOffset + (regionEndInClip - clip.startTime),
+                      name: clip.name,
+                      type: clip.type,
+                    };
+
+                    clip.duration = regionStartInClip - clip.startTime;
+
+                    // Shift the new clip to close the gap
+                    state.clips[newClipId].startTime -= fillerDuration;
+                  }
+                });
+              });
             }
+          }),
+
+        detectScenes: (mediaFileId) =>
+          set((state) => {
+            const transcript = state.transcripts[mediaFileId];
+            if (!transcript) return;
+
+            // Detect scenes based on long pauses between segments and speaker changes
+            const scenes: Scene[] = [];
+            let currentScene: Scene | null = null;
+
+            transcript.segments.forEach((segment, i) => {
+              const prevSegment = i > 0 ? transcript.segments[i - 1] : null;
+              const gapFromPrev = prevSegment ? segment.start - prevSegment.end : 0;
+              const speakerChanged = prevSegment && prevSegment.speaker !== segment.speaker;
+
+              // Start new scene on: first segment, long pause (>2s), or speaker change
+              if (!currentScene || gapFromPrev > 2 || speakerChanged) {
+                if (currentScene) {
+                  scenes.push(currentScene);
+                }
+                currentScene = {
+                  id: uuid(),
+                  name: `Scene ${scenes.length + 1}`,
+                  start: segment.start,
+                  end: segment.end,
+                  clipIds: [],
+                };
+              }
+
+              if (currentScene) {
+                currentScene.end = segment.end;
+              }
+            });
 
             if (currentScene) {
-              currentScene.end = segment.end;
+              scenes.push(currentScene);
             }
-          });
 
-          if (currentScene) {
-            scenes.push(currentScene);
-          }
+            transcript.scenes = scenes;
+          }),
 
-          transcript.scenes = scenes;
-        }),
+        setLeftPanelTab: (tab) =>
+          set((state) => {
+            state.leftPanelTab = tab;
+          }),
 
-      setLeftPanelTab: (tab) =>
-        set((state) => {
-          state.leftPanelTab = tab;
-        }),
+        getClipsForTrack: (trackId) =>
+          Object.values(get().clips)
+            .filter((c) => c.trackId === trackId)
+            .sort((a, b) => a.startTime - b.startTime),
 
-      getClipsForTrack: (trackId) =>
-        Object.values(get().clips)
-          .filter((c) => c.trackId === trackId)
-          .sort((a, b) => a.startTime - b.startTime),
-
-      getClipAtPlayhead: (trackId) => {
-        const playhead = get().playheadPosition;
-        return Object.values(get().clips).find(
-          (c) =>
-            c.trackId === trackId &&
-            playhead >= c.startTime &&
-            playhead < c.startTime + c.duration,
-        );
-      },
-
-      recalculateDuration: () =>
-        set((state) => {
-          const maxEnd = Object.values(state.clips).reduce(
-            (max, clip) => Math.max(max, clip.startTime + clip.duration),
-            0,
+        getClipAtPlayhead: (trackId) => {
+          const playhead = get().playheadPosition;
+          return Object.values(get().clips).find(
+            (c) =>
+              c.trackId === trackId &&
+              playhead >= c.startTime &&
+              playhead < c.startTime + c.duration,
           );
-          state.duration = maxEnd + 5; // 5s padding
+        },
+
+        recalculateDuration: () =>
+          set((state) => {
+            const maxEnd = Object.values(state.clips).reduce(
+              (max, clip) => Math.max(max, clip.startTime + clip.duration),
+              0,
+            );
+            state.duration = maxEnd + 5; // 5s padding
+          }),
+      })),
+      {
+        partialize: (state) => ({
+          tracks: state.tracks,
+          clips: state.clips,
+          transcripts: state.transcripts,
+          mediaFiles: state.mediaFiles,
         }),
-    })),
-    {
-      partialize: (state) => ({
-        tracks: state.tracks,
-        clips: state.clips,
-        transcripts: state.transcripts,
-        mediaFiles: state.mediaFiles,
-      }),
-    },
-  ),
-);
+      },
+    ),
+  );
+}
+
+// Context for dependency injection
+export const TimelineStoreContext = createContext<TimelineStore | null>(null);
+
+// Default singleton for standalone usage
+let defaultStore: TimelineStore | null = null;
+
+function getDefaultStore(): TimelineStore {
+  if (!defaultStore) {
+    defaultStore = createTimelineStore();
+  }
+  return defaultStore;
+}
+
+/**
+ * Hook that reads from either:
+ * 1. A store provided via CutlassProvider context (for embedded usage)
+ * 2. A default singleton store (for standalone usage)
+ */
+export function useTimelineStore(): TimelineState;
+export function useTimelineStore<T>(selector: (state: TimelineState) => T): T;
+export function useTimelineStore<T>(selector?: (state: TimelineState) => T) {
+  const contextStore = useContext(TimelineStoreContext);
+  const store = contextStore ?? getDefaultStore();
+  if (selector) {
+    return store(selector);
+  }
+  return store();
+}
+
+/**
+ * Access the raw store (needed for temporal undo/redo).
+ * Returns the Zustand store object, not the state.
+ */
+export function useTimelineStoreApi() {
+  const contextStore = useContext(TimelineStoreContext);
+  return contextStore ?? getDefaultStore();
+}

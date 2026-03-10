@@ -10,7 +10,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import { useTimelineStore } from '../../store/timeline';
+import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { formatTimecode } from '../../utils/time';
 import type { Tool } from '../../types';
 
@@ -27,7 +27,8 @@ export function Toolbar() {
     setZoom,
   } = useTimelineStore();
 
-  const temporal = useTimelineStore.temporal.getState();
+  const storeApi = useTimelineStoreApi();
+  const temporal = storeApi.temporal.getState();
 
   const tools: { tool: Tool; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
     { tool: 'select', icon: MousePointer2, label: 'Select', shortcut: 'V' },
