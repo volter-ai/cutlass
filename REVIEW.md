@@ -34,6 +34,19 @@ because `addMediaFile` is idempotent (`state.mediaFiles[id] = file`).
 
 ---
 
+## Bahar tester feedback — fixes (2026-03-11)
+
+| Issue | Fix |
+|-------|-----|
+| Video fade in/out had no effect | `Viewer.tsx`: multiply video opacity by `computeVideoFadeMultiplier`; `export.ts`: add `fade=t=in/out` FFmpeg filters for video clips |
+| Transcript → captions required manual copy-paste | New `addTranscriptCaptionsToTimeline` store action; "Add Captions" button in Transcript panel creates timed `TextOverlay` objects visible in preview |
+| No background option for vertical/square aspect ratios | `backgroundColor` added to `ProjectSettings`; color picker in Settings panel; applied in viewer and FFmpeg export canvas |
+| Undo/redo too granular (one entry per drag pixel) | `temporal.pause()` at drag start, `temporal.resume()` at drag end in `TimelineClip` and `TextOverlayClip` |
+
+Open GitHub issues filed for remaining UX items: #8 (effect discoverability), #9 (animation/transition badges on clips).
+
+---
+
 ## No open actionable issues
 
 After three review passes the following have all been addressed:
