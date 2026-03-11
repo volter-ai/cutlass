@@ -164,6 +164,8 @@ export function TimelineTrack({ track }: Props) {
       {/* Track content */}
       <div
         className="relative flex-1 border-b"
+        data-track-id={track.id}
+        data-track-type={track.type}
         style={{
           borderColor: 'var(--border)',
           background: bgTint,

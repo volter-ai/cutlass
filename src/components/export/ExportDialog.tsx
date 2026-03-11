@@ -134,6 +134,11 @@ export function ExportDialog() {
               />
               {t.export.burnCaptions}
             </label>
+            {exportSettings.burnCaptions && (
+              <p className="text-xs ml-6" style={{ color: 'var(--text-secondary)' }}>
+                {t.export.captionHint ?? 'Requires captions generated via Transcript tab.'}
+              </p>
+            )}
           </div>
 
           {/* Error display */}

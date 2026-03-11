@@ -6,17 +6,38 @@ import { ClipContextMenu } from './ClipContextMenu';
 import { createMediaFile } from '../../utils/media';
 import type { TimelineClip as TClip } from '../../types';
 
-/** Stable waveform bars — heights are generated once per clip ID */
+/** Seeded PRNG for deterministic waveforms per clip */
+function seededRandom(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+  }
+  return () => {
+    h = (h * 16807 + 0) % 2147483647;
+    return (h & 0x7fffffff) / 0x7fffffff;
+  };
+}
+
+/** Stable waveform bars — heights are seeded from clip ID */
 function WaveformBars({ clipId }: { clipId: string }) {
-  const bars = useMemo(
-    () => Array.from({ length: 50 }, (_, i) => ({ i, h: Math.random() * 16 + 2 })),
-    [clipId], // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  const bars = useMemo(() => {
+    const rng = seededRandom(clipId);
+    const count = 80;
+    return Array.from({ length: count }, (_, i) => {
+      const t = i / (count - 1); // 0..1 position
+      // Envelope: louder in middle, quieter at edges
+      const envelope = 0.4 + 0.6 * Math.sin(t * Math.PI);
+      const h = (rng() * 16 + 2) * envelope;
+      return { i, h };
+    });
+  }, [clipId]);
+
+  const totalW = 80 * 1.25; // count * spacing
   return (
-    <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
-      <svg viewBox="0 0 100 20" className="w-full h-3/4" preserveAspectRatio="none">
+    <div className="absolute inset-0 flex items-center justify-center opacity-50 pointer-events-none">
+      <svg viewBox={`0 0 ${totalW} 20`} className="w-full h-4/5" preserveAspectRatio="none">
         {bars.map(({ i, h }) => (
-          <rect key={i} x={i * 2} y={10 - h / 2} width={1.5} height={h} fill="white" />
+          <rect key={i} x={i * 1.25} y={10 - h / 2} width={0.8} height={h} fill="rgba(255,255,255,0.8)" rx={0.3} />
         ))}
       </svg>
     </div>
@@ -136,6 +157,19 @@ export function TimelineClipComponent({ clip }: Props) {
               }
               newTime = Math.max(0, snapped);
             }
+
+            // Detect cross-track drop via DOM
+            let targetTrackId: string | undefined;
+            const els = document.elementsFromPoint(moveEvent.clientX, moveEvent.clientY);
+            for (const el of els) {
+              const tid = (el as HTMLElement).dataset?.trackId;
+              const ttype = (el as HTMLElement).dataset?.trackType;
+              if (tid && ttype === clip.type) {
+                targetTrackId = tid !== clip.trackId ? tid : undefined;
+                break;
+              }
+            }
+
             if (isMultiDrag) {
               const positions: Record<string, number> = {};
               for (const [id, initial] of Object.entries(initialPositions)) {
@@ -143,7 +177,7 @@ export function TimelineClipComponent({ clip }: Props) {
               }
               moveClipsBatch(positions);
             } else {
-              moveClip(clip.id, newTime);
+              moveClip(clip.id, newTime, targetTrackId);
             }
             break;
           }

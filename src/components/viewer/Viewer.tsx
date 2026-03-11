@@ -218,54 +218,64 @@ export function Viewer() {
 
       {/* Video Area */}
       <div className="flex-1 flex items-center justify-center relative overflow-hidden">
-        {activeMedia ? (
-          <video
-            ref={videoRef}
-            className="max-w-full max-h-full"
-            style={{
-              objectFit: activeClip?.fitMode === 'fill' ? 'cover'
-                : activeClip?.fitMode === 'stretch' ? 'fill'
-                : 'contain',
-              transform: combinedTransform || undefined,
-              opacity: animStyle.opacity * transitionOpacity,
-            }}
-            muted
-            playsInline
-          />
-        ) : (
-          <div className="text-center" style={{ color: 'var(--text-secondary)' }}>
-            <p className="text-sm">{t.viewer.noClip}</p>
-            <p className="text-xs mt-1">{t.viewer.importMedia}</p>
-          </div>
-        )}
+        <div
+          className="relative max-w-full max-h-full overflow-hidden"
+          style={{
+            aspectRatio: `${resolution.width}/${resolution.height}`,
+            background: '#000',
+          }}
+        >
+          {activeMedia ? (
+            <video
+              ref={videoRef}
+              className="w-full h-full"
+              style={{
+                objectFit: activeClip?.fitMode === 'fill' ? 'cover'
+                  : activeClip?.fitMode === 'stretch' ? 'fill'
+                  : 'contain',
+                transform: combinedTransform || undefined,
+                opacity: animStyle.opacity * transitionOpacity,
+              }}
+              muted
+              playsInline
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-center" style={{ color: 'var(--text-secondary)' }}>
+              <div>
+                <p className="text-sm">{t.viewer.noClip}</p>
+                <p className="text-xs mt-1">{t.viewer.importMedia}</p>
+              </div>
+            </div>
+          )}
 
-        {/* Text overlays */}
-        {activeTextOverlays.map((overlay) => (
-          <div
-            key={overlay.id}
-            style={{
-              position: 'absolute',
-              left: `${overlay.style.x}%`,
-              top: `${overlay.style.y}%`,
-              transform: 'translate(-50%, -50%)',
-              fontFamily: overlay.style.fontFamily,
-              fontSize: Math.round(overlay.style.fontSize * fontScale),
-              fontWeight: overlay.style.fontWeight,
-              color: overlay.style.color,
-              textAlign: overlay.style.textAlign,
-              backgroundColor: overlay.style.backgroundColor !== 'transparent' ? overlay.style.backgroundColor : undefined,
-              padding: overlay.style.backgroundColor !== 'transparent' ? '4px 8px' : undefined,
-              textShadow: overlay.style.outline
-                ? `-1px -1px 0 ${overlay.style.outlineColor}, 1px -1px 0 ${overlay.style.outlineColor}, -1px 1px 0 ${overlay.style.outlineColor}, 1px 1px 0 ${overlay.style.outlineColor}`
-                : undefined,
-              pointerEvents: 'none',
-              whiteSpace: 'nowrap',
-              zIndex: 10,
-            }}
-          >
-            {overlay.text}
-          </div>
-        ))}
+          {/* Text overlays */}
+          {activeTextOverlays.map((overlay) => (
+            <div
+              key={overlay.id}
+              style={{
+                position: 'absolute',
+                left: `${overlay.style.x}%`,
+                top: `${overlay.style.y}%`,
+                transform: 'translate(-50%, -50%)',
+                fontFamily: overlay.style.fontFamily,
+                fontSize: Math.round(overlay.style.fontSize * fontScale),
+                fontWeight: overlay.style.fontWeight,
+                color: overlay.style.color,
+                textAlign: overlay.style.textAlign,
+                backgroundColor: overlay.style.backgroundColor !== 'transparent' ? overlay.style.backgroundColor : undefined,
+                padding: overlay.style.backgroundColor !== 'transparent' ? '4px 8px' : undefined,
+                textShadow: overlay.style.outline
+                  ? `-1px -1px 0 ${overlay.style.outlineColor}, 1px -1px 0 ${overlay.style.outlineColor}, -1px 1px 0 ${overlay.style.outlineColor}, 1px 1px 0 ${overlay.style.outlineColor}`
+                  : undefined,
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+                zIndex: 10,
+              }}
+            >
+              {overlay.text}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

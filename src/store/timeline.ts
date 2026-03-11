@@ -113,7 +113,7 @@ export interface TimelineState {
 
   // Actions - Text Overlays
   addTextOverlay: (trackId: string, startTime: number, text: string) => string;
-  updateTextOverlay: (id: string, updates: Partial<Pick<TextOverlay, 'text' | 'startTime' | 'duration' | 'style'>>) => void;
+  updateTextOverlay: (id: string, updates: Partial<Pick<TextOverlay, 'text' | 'startTime' | 'duration'>> & { style?: Partial<TextOverlay['style']> }) => void;
   removeTextOverlay: (id: string) => void;
   selectTextOverlay: (id: string | null) => void;
 

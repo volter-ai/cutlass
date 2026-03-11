@@ -76,7 +76,37 @@ export function useKeyboardShortcuts() {
           break;
 
         case 'c':
-          if (!isMeta) store.setActiveTool('razor');
+          if (!isMeta) {
+            e.preventDefault();
+            // Cut all clips at playhead
+            const playhead = store.playheadPosition;
+            Object.values(store.clips).forEach((clip) => {
+              if (
+                playhead > clip.startTime &&
+                playhead < clip.startTime + clip.duration
+              ) {
+                store.splitClipAtPlayhead(clip.id);
+              }
+            });
+          }
+          break;
+
+        case 'd':
+          if (isMeta && store.selectedClipIds.length > 0) {
+            e.preventDefault();
+            // Duplicate selected clips, placing copies right after originals
+            for (const id of [...store.selectedClipIds]) {
+              const clip = store.clips[id];
+              if (!clip) continue;
+              store.addClipToTrack(
+                clip.mediaFileId,
+                clip.trackId,
+                clip.startTime + clip.duration,
+                clip.mediaOffset,
+                clip.duration,
+              );
+            }
+          }
           break;
 
         case 't':

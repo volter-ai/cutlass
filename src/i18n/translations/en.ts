@@ -117,6 +117,7 @@ export const en = {
     exportBtn: 'Export',
     cancel: 'Cancel',
     exportFailed: 'Export failed. Check the browser console for details.',
+    captionHint: 'Requires captions generated via the Transcript tab.',
   },
 
   // Settings
@@ -143,6 +144,14 @@ export const en = {
     tiktok: 'TikTok',
     youtube: 'YouTube',
     minimal: 'Minimal',
+    // Text overlay style
+    textStyle: 'Text Style',
+    fontFamily: 'Font',
+    fontWeight: 'Weight',
+    textColor: 'Color',
+    bgColor: 'Background',
+    textAlign: 'Align',
+    textOutline: 'Outline',
   },
 
   // Transcript
@@ -225,7 +234,7 @@ export const en = {
         title: 'Tools',
         shortcuts: [
           { keys: 'V', desc: 'Select tool' },
-          { keys: 'C', desc: 'Razor tool' },
+          { keys: 'C', desc: 'Cut at playhead' },
           { keys: 'T', desc: 'Text tool' },
           { keys: 'S', desc: 'Toggle snap' },
         ],
@@ -238,6 +247,7 @@ export const en = {
           { keys: '\u21e7 Delete', desc: 'Ripple delete' },
           { keys: 'U', desc: 'Extract / unlink audio' },
           { keys: 'Right-click', desc: 'Clip context menu' },
+          { keys: '\u2318 D', desc: 'Duplicate selected clips' },
         ],
       },
       {
@@ -354,7 +364,22 @@ export const en = {
     // Update log (most recent first)
     updateEntries: [
       {
-        date: '2026-03-11',
+        date: '2026-03-11 (v3)',
+        items: [
+          'C key now cuts all clips at the playhead position (instant cut).',
+          'Ctrl/Cmd+D duplicates selected clips, placing copies right after the originals.',
+          'Viewer preview now respects aspect ratio (16:9, 9:16, 1:1, 4:5).',
+          'Text overlay styling panel in Settings: font, size, weight, color, background, position, align, outline.',
+          'Cross-track drag: move clips between tracks of the same type.',
+          'Resizable viewer/timeline split: drag the divider to resize panels.',
+          'Export dialog now shows a caption hint when burn captions is enabled.',
+          'Improved audio waveform visuals with denser, seeded-random bars and natural envelope.',
+          'Right-click context menu on text overlays for Edit and Delete.',
+          'Delete/Backspace key removes selected text overlays.',
+        ],
+      },
+      {
+        date: '2026-03-11 (v2)',
         items: [
           'Snap now works: clips and text overlays snap to nearby edges while dragging, trimming, or resizing.',
           'Text overlays now render live in the Viewer preview with correct position, font, and style.',

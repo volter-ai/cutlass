@@ -1,10 +1,26 @@
-import { Key, Monitor, Type } from 'lucide-react';
+import { Key, Monitor, Type, Palette } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
-import type { AspectRatio, CaptionStyle } from '../../types';
+import type { AspectRatio, CaptionStyle, TextStyle } from '../../types';
+
+const FONT_FAMILIES = [
+  'Arial', 'Helvetica', 'Georgia', 'Times New Roman', 'Courier New',
+  'Verdana', 'Impact', 'Comic Sans MS', 'Trebuchet MS',
+];
 
 export function SettingsPanel() {
   const { settings, setAspectRatio, setDeepgramApiKey, setCaptionStyle } = useTimelineStore();
+  const selectedTextOverlayId = useTimelineStore((s) => s.selectedTextOverlayId);
+  const textOverlays = useTimelineStore((s) => s.textOverlays);
+  const updateTextOverlay = useTimelineStore((s) => s.updateTextOverlay);
+
+  const selectedOverlay = selectedTextOverlayId ? textOverlays[selectedTextOverlayId] : null;
+
+  const updateStyle = (updates: Partial<TextStyle>) => {
+    if (selectedTextOverlayId) {
+      updateTextOverlay(selectedTextOverlayId, { style: updates });
+    }
+  };
   const { t } = useLanguage();
 
   const ASPECT_OPTIONS: { ratio: AspectRatio; label: string; desc: string }[] = [
@@ -159,6 +175,200 @@ export function SettingsPanel() {
             />
           </div>
         </section>
+
+        {/* Text Overlay Style (when selected) */}
+        {selectedOverlay && (
+          <section>
+            <div className="flex items-center gap-1.5 mb-2">
+              <Palette size={12} style={{ color: 'var(--accent)' }} />
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {t.settings.textStyle ?? 'Text Style'}
+              </span>
+            </div>
+            <p className="text-xs mb-2 truncate" style={{ color: 'var(--text-secondary)' }}>
+              {selectedOverlay.text}
+            </p>
+
+            {/* Font Family */}
+            <div className="mb-2">
+              <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                {t.settings.fontFamily ?? 'Font'}
+              </label>
+              <select
+                value={selectedOverlay.style.fontFamily}
+                onChange={(e) => updateStyle({ fontFamily: e.target.value })}
+                className="w-full text-xs px-2 py-1 rounded border"
+                style={{
+                  background: 'var(--bg-surface)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {FONT_FAMILIES.map((f) => (
+                  <option key={f} value={f}>{f}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Font Size */}
+            <div className="mb-2">
+              <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                {t.settings.fontSize}: {selectedOverlay.style.fontSize}px
+              </label>
+              <input
+                type="range"
+                min={12}
+                max={120}
+                value={selectedOverlay.style.fontSize}
+                onChange={(e) => updateStyle({ fontSize: Number(e.target.value) })}
+                className="w-full"
+              />
+            </div>
+
+            {/* Font Weight */}
+            <div className="mb-2">
+              <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                {t.settings.fontWeight ?? 'Weight'}
+              </label>
+              <div className="flex gap-1">
+                {(['normal', 'bold'] as const).map((w) => (
+                  <button
+                    key={w}
+                    onClick={() => updateStyle({ fontWeight: w })}
+                    className="flex-1 px-2 py-1 rounded text-xs"
+                    style={{
+                      background: selectedOverlay.style.fontWeight === w ? 'var(--accent)' : 'var(--bg-surface)',
+                      color: selectedOverlay.style.fontWeight === w ? 'white' : 'var(--text-secondary)',
+                      fontWeight: w,
+                    }}
+                  >
+                    {w === 'normal' ? 'Normal' : 'Bold'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Text Color */}
+            <div className="mb-2">
+              <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                {t.settings.textColor ?? 'Color'}
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={selectedOverlay.style.color}
+                  onChange={(e) => updateStyle({ color: e.target.value })}
+                  className="w-6 h-6 rounded cursor-pointer border-0"
+                />
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  {selectedOverlay.style.color}
+                </span>
+              </div>
+            </div>
+
+            {/* Background Color */}
+            <div className="mb-2">
+              <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                {t.settings.bgColor ?? 'Background'}
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={selectedOverlay.style.backgroundColor === 'transparent' ? '#000000' : selectedOverlay.style.backgroundColor}
+                  onChange={(e) => updateStyle({ backgroundColor: e.target.value })}
+                  className="w-6 h-6 rounded cursor-pointer border-0"
+                />
+                <button
+                  onClick={() => updateStyle({ backgroundColor: 'transparent' })}
+                  className="text-xs px-2 py-0.5 rounded"
+                  style={{
+                    background: selectedOverlay.style.backgroundColor === 'transparent' ? 'var(--accent)' : 'var(--bg-surface)',
+                    color: selectedOverlay.style.backgroundColor === 'transparent' ? 'white' : 'var(--text-secondary)',
+                  }}
+                >
+                  {t.contextMenu.none}
+                </button>
+              </div>
+            </div>
+
+            {/* Text Align */}
+            <div className="mb-2">
+              <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                {t.settings.textAlign ?? 'Align'}
+              </label>
+              <div className="flex gap-1">
+                {(['left', 'center', 'right'] as const).map((a) => (
+                  <button
+                    key={a}
+                    onClick={() => updateStyle({ textAlign: a })}
+                    className="flex-1 px-2 py-1 rounded text-xs"
+                    style={{
+                      background: selectedOverlay.style.textAlign === a ? 'var(--accent)' : 'var(--bg-surface)',
+                      color: selectedOverlay.style.textAlign === a ? 'white' : 'var(--text-secondary)',
+                    }}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Position X / Y */}
+            <div className="mb-2 grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                  X: {Math.round(selectedOverlay.style.x)}%
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={selectedOverlay.style.x}
+                  onChange={(e) => updateStyle({ x: Number(e.target.value) })}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                  Y: {Math.round(selectedOverlay.style.y)}%
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={selectedOverlay.style.y}
+                  onChange={(e) => updateStyle({ y: Number(e.target.value) })}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            {/* Outline */}
+            <div className="mb-2">
+              <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={selectedOverlay.style.outline}
+                  onChange={(e) => updateStyle({ outline: e.target.checked })}
+                />
+                {t.settings.textOutline ?? 'Outline'}
+              </label>
+              {selectedOverlay.style.outline && (
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={selectedOverlay.style.outlineColor}
+                    onChange={(e) => updateStyle({ outlineColor: e.target.value })}
+                    className="w-6 h-6 rounded cursor-pointer border-0"
+                  />
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    {selectedOverlay.style.outlineColor}
+                  </span>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

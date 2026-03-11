@@ -119,6 +119,7 @@ export const es: Translations = {
     exportBtn: 'Exportar',
     cancel: 'Cancelar',
     exportFailed: 'La exportaci\u00f3n fall\u00f3. Revisa la consola del navegador para m\u00e1s detalles.',
+    captionHint: 'Requiere subtítulos generados desde la pestaña Transcripción.',
   },
 
   // Settings
@@ -145,6 +146,14 @@ export const es: Translations = {
     tiktok: 'TikTok',
     youtube: 'YouTube',
     minimal: 'Minimal',
+    // Text overlay style
+    textStyle: 'Estilo de texto',
+    fontFamily: 'Fuente',
+    fontWeight: 'Peso',
+    textColor: 'Color',
+    bgColor: 'Fondo',
+    textAlign: 'Alineación',
+    textOutline: 'Contorno',
   },
 
   // Transcript
@@ -227,7 +236,7 @@ export const es: Translations = {
         title: 'Herramientas',
         shortcuts: [
           { keys: 'V', desc: 'Herramienta Seleccionar' },
-          { keys: 'C', desc: 'Herramienta Cortar' },
+          { keys: 'C', desc: 'Cortar en el cabezal' },
           { keys: 'T', desc: 'Herramienta Texto' },
           { keys: 'S', desc: 'Alternar ajuste' },
         ],
@@ -240,6 +249,7 @@ export const es: Translations = {
           { keys: '\u21e7 Delete', desc: 'Eliminaci\u00f3n con ondulaci\u00f3n' },
           { keys: 'U', desc: 'Extraer / desvincular audio' },
           { keys: 'Clic derecho', desc: 'Men\u00fa contextual del clip' },
+          { keys: '\u2318 D', desc: 'Duplicar clips seleccionados' },
         ],
       },
       {
@@ -356,7 +366,22 @@ export const es: Translations = {
     // Update log (most recent first)
     updateEntries: [
       {
-        date: '2026-03-11',
+        date: '2026-03-11 (v3)',
+        items: [
+          'La tecla C ahora corta todos los clips en la posición del cabezal de reproducción.',
+          'Ctrl/Cmd+D duplica los clips seleccionados, colocando copias justo después de los originales.',
+          'La vista previa del visor ahora respeta la relación de aspecto (16:9, 9:16, 1:1, 4:5).',
+          'Panel de estilo de texto en Ajustes: fuente, tamaño, peso, color, fondo, posición, alineación, contorno.',
+          'Arrastre entre pistas: mueve clips entre pistas del mismo tipo.',
+          'División visor/línea de tiempo redimensionable: arrastra el divisor para cambiar el tamaño.',
+          'El diálogo de exportación muestra una nota cuando se habilitan subtítulos incrustados.',
+          'Mejoras visuales en forma de onda: barras más densas con envolvente natural.',
+          'Menú contextual en textos superpuestos para Editar y Eliminar.',
+          'Tecla Delete/Backspace elimina textos superpuestos seleccionados.',
+        ],
+      },
+      {
+        date: '2026-03-11 (v2)',
         items: [
           'El ajuste ahora funciona: clips y textos se alinean a bordes cercanos al arrastrar, recortar o redimensionar.',
           'Los textos superpuestos ahora se muestran en vivo en el Visor con posici\u00f3n, fuente y estilo correctos.',

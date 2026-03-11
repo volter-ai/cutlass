@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Toolbar } from './components/toolbar/Toolbar';
 import { MediaBin } from './components/media-bin/MediaBin';
 import { TranscriptPanel } from './components/transcript/TranscriptPanel';
@@ -30,6 +30,34 @@ export default function App() {
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasRestoredRef = useRef(false);
   const { t } = useLanguage();
+
+  // Resizable viewer/timeline split (percentage of right panel height for viewer)
+  const [viewerPct, setViewerPct] = useState(45);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+
+  const handleDividerDrag = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const panel = rightPanelRef.current;
+    if (!panel) return;
+
+    const handleMove = (moveEvent: MouseEvent) => {
+      const rect = panel.getBoundingClientRect();
+      const pct = ((moveEvent.clientY - rect.top) / rect.height) * 100;
+      setViewerPct(Math.max(20, Math.min(80, pct)));
+    };
+
+    const handleUp = () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+  }, []);
 
   const tabLabels: Record<(typeof TABS)[number], string> = {
     media: t.tabs.media,
@@ -136,11 +164,18 @@ export default function App() {
         </div>
 
         {/* Right: Viewer + Timeline */}
-        <div className="flex flex-col flex-1 min-w-0">
+        <div ref={rightPanelRef} className="flex flex-col flex-1 min-w-0">
           {/* Viewer */}
-          <div className="border-b" style={{ height: '45%', borderColor: 'var(--border)' }}>
+          <div className="border-b" style={{ height: `${viewerPct}%`, borderColor: 'var(--border)' }}>
             <Viewer />
           </div>
+
+          {/* Resizable divider */}
+          <div
+            className="flex-shrink-0 cursor-row-resize hover:bg-[var(--accent)] transition-colors"
+            style={{ height: 4, background: 'var(--border)' }}
+            onMouseDown={handleDividerDrag}
+          />
 
           {/* Timeline */}
           <div className="flex-1 min-h-0">
