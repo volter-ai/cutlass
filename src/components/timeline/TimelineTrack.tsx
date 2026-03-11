@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Volume2, VolumeX, Lock, Unlock, Eye, EyeOff, Type } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
+import { useLanguage } from '../../context/LanguageProvider';
 import { TimelineClipComponent } from './TimelineClip';
 import { TextOverlayClip } from './TextOverlayClip';
 import type { Track } from '../../types';
@@ -17,6 +18,7 @@ export function TimelineTrack({ track }: Props) {
   const activeTool = useTimelineStore((s) => s.activeTool);
   const { toggleTrackMute, toggleTrackLock, setTrackVolume, addClipToTrack, addTextOverlay, clearSelection } =
     useTimelineStore();
+  const { t } = useLanguage();
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
 
   const trackClips = Object.values(clips)
@@ -72,7 +74,7 @@ export function TimelineTrack({ track }: Props) {
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const startTime = Math.max(0, x / zoom);
-        const text = prompt('Enter text:');
+        const text = prompt(t.clip.enterText);
         if (text) {
           addTextOverlay(track.id, startTime, text);
         }
@@ -109,7 +111,7 @@ export function TimelineTrack({ track }: Props) {
           onClick={() => toggleTrackMute(track.id)}
           className="p-0.5 rounded transition-colors hover:opacity-80"
           style={{ color: track.muted ? 'var(--playhead)' : 'var(--text-secondary)' }}
-          title={track.muted ? 'Unmute' : 'Mute'}
+          title={track.muted ? t.track.unmute : t.track.mute}
         >
           <MuteIcon size={11} />
         </button>
@@ -118,7 +120,7 @@ export function TimelineTrack({ track }: Props) {
           onClick={() => toggleTrackLock(track.id)}
           className="p-0.5 rounded transition-colors hover:opacity-80"
           style={{ color: track.locked ? 'var(--filler-highlight)' : 'var(--text-secondary)' }}
-          title={track.locked ? 'Unlock' : 'Lock'}
+          title={track.locked ? t.track.unlock : t.track.lock}
         >
           {track.locked ? <Lock size={11} /> : <Unlock size={11} />}
         </button>

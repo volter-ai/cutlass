@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '../../context/AuthProvider';
+import { useLanguage } from '../../context/LanguageProvider';
 
 interface AuthModalProps {
   open: boolean;
@@ -9,6 +10,7 @@ interface AuthModalProps {
 
 export function AuthModal({ open, onClose }: AuthModalProps) {
   const { signIn, signUp } = useAuth();
+  const { t } = useLanguage();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -60,7 +62,7 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
           <h2 className="text-sm font-bold">
-            {mode === 'signin' ? 'Sign In' : 'Create Account'}
+            {mode === 'signin' ? t.auth.signIn : t.auth.createAccount}
           </h2>
           <button onClick={onClose} className="p-1 rounded hover:opacity-80" style={{ color: 'var(--text-secondary)' }}>
             <X size={14} />
@@ -70,7 +72,7 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-4 space-y-3">
           <div>
-            <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Email</label>
+            <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>{t.auth.email}</label>
             <input
               type="email"
               value={email}
@@ -81,7 +83,7 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
             />
           </div>
           <div>
-            <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Password</label>
+            <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>{t.auth.password}</label>
             <input
               type="password"
               value={password}
@@ -105,7 +107,7 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
             className="w-full py-1.5 rounded text-xs font-semibold transition-colors"
             style={{ background: 'var(--accent)', color: 'white', opacity: loading ? 0.6 : 1 }}
           >
-            {loading ? 'Loading...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+            {loading ? t.auth.loading : mode === 'signin' ? t.auth.signIn : t.auth.createAccount}
           </button>
         </form>
 
@@ -116,7 +118,7 @@ export function AuthModal({ open, onClose }: AuthModalProps) {
             className="text-xs hover:underline"
             style={{ color: 'var(--accent)' }}
           >
-            {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+            {mode === 'signin' ? t.auth.noAccount : t.auth.hasAccount}
           </button>
         </div>
       </div>

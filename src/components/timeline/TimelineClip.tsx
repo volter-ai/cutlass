@@ -1,6 +1,7 @@
 import { useRef, useCallback, useState } from 'react';
 import { Link, AlertTriangle } from 'lucide-react';
 import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
+import { useLanguage } from '../../context/LanguageProvider';
 import { ClipContextMenu } from './ClipContextMenu';
 import { createMediaFile } from '../../utils/media';
 import type { TimelineClip as TClip } from '../../types';
@@ -27,6 +28,7 @@ export function TimelineClipComponent({ clip }: Props) {
   } = useTimelineStore();
 
   const storeApi = useTimelineStoreApi();
+  const { t } = useLanguage();
   const isMissing = !mediaFiles[clip.mediaFileId];
 
   const clipRef = useRef<HTMLDivElement>(null);
@@ -247,7 +249,7 @@ export function TimelineClipComponent({ clip }: Props) {
           className="absolute top-0 left-0 w-3 h-3 cursor-ew-resize z-20 opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ background: 'rgba(255,255,255,0.7)', borderRadius: '0 0 4px 0' }}
           onMouseDown={(e) => handleFadeDrag(e, 'in')}
-          title="Drag to set fade in"
+          title={t.clip.dragFadeIn}
         />
 
         {/* Fade out drag handle */}
@@ -255,7 +257,7 @@ export function TimelineClipComponent({ clip }: Props) {
           className="absolute top-0 right-0 w-3 h-3 cursor-ew-resize z-20 opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ background: 'rgba(255,255,255,0.7)', borderRadius: '0 0 0 4px' }}
           onMouseDown={(e) => handleFadeDrag(e, 'out')}
-          title="Drag to set fade out"
+          title={t.clip.dragFadeOut}
         />
 
         {/* Volume rubber band line */}
@@ -332,10 +334,10 @@ export function TimelineClipComponent({ clip }: Props) {
             className="absolute inset-0 flex flex-col items-center justify-center z-30 cursor-pointer"
             style={{ background: 'rgba(0,0,0,0.7)' }}
             onClick={(e) => { e.stopPropagation(); handleRelink(); }}
-            title="Click to re-link media file"
+            title={t.clip.relinkTitle}
           >
             <AlertTriangle size={12} color="#ef4444" />
-            <span className="text-xs mt-0.5" style={{ color: '#ef4444', fontSize: 9 }}>Re-link</span>
+            <span className="text-xs mt-0.5" style={{ color: '#ef4444', fontSize: 9 }}>{t.clip.relink}</span>
           </div>
         )}
 

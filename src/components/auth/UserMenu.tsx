@@ -3,9 +3,11 @@ import { User, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthProvider';
 import { isSupabaseConfigured } from '../../services/supabase';
 import { AuthModal } from './AuthModal';
+import { useLanguage } from '../../context/LanguageProvider';
 
 export function UserMenu() {
   const { user, loading, signOut } = useAuth();
+  const { t } = useLanguage();
   const [showMenu, setShowMenu] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -31,7 +33,7 @@ export function UserMenu() {
           style={{ color: 'var(--text-secondary)' }}
         >
           <User size={14} />
-          Sign In
+          {t.auth.signIn}
         </button>
         <AuthModal open={showAuth} onClose={() => setShowAuth(false)} />
       </>
@@ -64,7 +66,7 @@ export function UserMenu() {
             style={{ color: 'var(--text-primary)' }}
           >
             <LogOut size={12} />
-            Sign Out
+            {t.auth.signOut}
           </button>
         </div>
       )}

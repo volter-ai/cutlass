@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { Maximize2 } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
+import { useLanguage } from '../../context/LanguageProvider';
 import type { TimelineClip, AnimationPreset } from '../../types';
 
 /** Compute CSS transform + opacity for a clip animation at a given progress (0-1 through clip) */
@@ -76,6 +77,7 @@ export function Viewer() {
   const clips = useTimelineStore((s) => s.clips);
   const tracks = useTimelineStore((s) => s.tracks);
   const mediaFiles = useTimelineStore((s) => s.mediaFiles);
+  const { t } = useLanguage();
 
   // Find the active video clip at the current playhead position
   const videoTracks = tracks.filter((t) => t.type === 'video');
@@ -165,7 +167,7 @@ export function Viewer() {
         style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}
       >
         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-          Program
+          {t.viewer.title}
         </span>
         <button
           onClick={handleFullscreen}
@@ -194,8 +196,8 @@ export function Viewer() {
           />
         ) : (
           <div className="text-center" style={{ color: 'var(--text-secondary)' }}>
-            <p className="text-sm">No clip at playhead</p>
-            <p className="text-xs mt-1">Import media and add to the timeline</p>
+            <p className="text-sm">{t.viewer.noClip}</p>
+            <p className="text-xs mt-1">{t.viewer.importMedia}</p>
           </div>
         )}
       </div>

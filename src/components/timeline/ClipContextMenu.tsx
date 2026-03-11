@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Unlink, AudioLines, Scissors, ChevronRight } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
+import { useLanguage } from '../../context/LanguageProvider';
 import type { AnimationPreset } from '../../types';
 
 interface Props {
@@ -10,41 +11,41 @@ interface Props {
 }
 
 const FADE_OPTIONS = [
-  { label: 'None', value: 0 },
-  { label: '0.25s', value: 0.25 },
-  { label: '0.5s', value: 0.5 },
-  { label: '1s', value: 1 },
-  { label: '2s', value: 2 },
+  { value: 0 },
+  { value: 0.25 },
+  { value: 0.5 },
+  { value: 1 },
+  { value: 2 },
 ];
 
 const SPEED_OPTIONS = [
   { label: '0.25x', value: 0.25 },
   { label: '0.5x', value: 0.5 },
   { label: '0.75x', value: 0.75 },
-  { label: '1x (Normal)', value: 1 },
+  { value: 1 },
   { label: '1.5x', value: 1.5 },
   { label: '2x', value: 2 },
   { label: '4x', value: 4 },
 ];
 
-const ANIMATION_PRESETS: { label: string; value: AnimationPreset }[] = [
-  { label: 'None', value: 'none' },
-  { label: 'Fade In', value: 'fade-in' },
-  { label: 'Fade Out', value: 'fade-out' },
-  { label: 'Fade In/Out', value: 'fade-in-out' },
-  { label: 'Slide Left', value: 'slide-left' },
-  { label: 'Slide Right', value: 'slide-right' },
-  { label: 'Slide Up', value: 'slide-up' },
-  { label: 'Slide Down', value: 'slide-down' },
-  { label: 'Zoom In', value: 'zoom-in' },
-  { label: 'Zoom Out', value: 'zoom-out' },
-  { label: 'Ken Burns', value: 'ken-burns' },
+const ANIMATION_PRESETS: { key: string; value: AnimationPreset }[] = [
+  { key: 'animNone', value: 'none' },
+  { key: 'animFadeIn', value: 'fade-in' },
+  { key: 'animFadeOut', value: 'fade-out' },
+  { key: 'animFadeInOut', value: 'fade-in-out' },
+  { key: 'animSlideLeft', value: 'slide-left' },
+  { key: 'animSlideRight', value: 'slide-right' },
+  { key: 'animSlideUp', value: 'slide-up' },
+  { key: 'animSlideDown', value: 'slide-down' },
+  { key: 'animZoomIn', value: 'zoom-in' },
+  { key: 'animZoomOut', value: 'zoom-out' },
+  { key: 'animKenBurns', value: 'ken-burns' },
 ];
 
 const TRANSITION_TYPES = [
-  { label: 'Cross Dissolve', value: 'cross-dissolve' as const },
-  { label: 'Fade to Black', value: 'fade-to-black' as const },
-  { label: 'Fade from Black', value: 'fade-from-black' as const },
+  { key: 'crossDissolve', value: 'cross-dissolve' as const },
+  { key: 'fadeToBlack', value: 'fade-to-black' as const },
+  { key: 'fadeFromBlack', value: 'fade-from-black' as const },
 ];
 
 export function ClipContextMenu({ clipId, position, onClose }: Props) {
@@ -62,6 +63,7 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
     setClipVolume,
     removeClip,
   } = useTimelineStore();
+  const { t } = useLanguage();
 
   const [openSub, setOpenSub] = useState<string | null>(null);
 
@@ -98,6 +100,12 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
   const clipAnimationPreset = clip.animation?.preset ?? 'none';
   const clipFitMode = clip.fitMode ?? 'fit';
   const clipScale = clip.scale ?? 1;
+
+  const cm = t.contextMenu;
+
+  const fadeLabel = (v: number) => v === 0 ? cm.none : `${v}s`;
+  const speedLabel = (opt: { label?: string; value: number }) =>
+    opt.value === 1 ? cm.normal : (opt.label ?? `${opt.value}x`);
 
   const menuStyle: React.CSSProperties = {
     position: 'fixed',
@@ -154,7 +162,7 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
           onMouseEnter={() => setOpenSub(null)}
         >
           <AudioLines size={12} />
-          Extract Audio
+          {cm.extractAudio}
         </button>
       )}
 
@@ -166,7 +174,7 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
           onMouseEnter={() => setOpenSub(null)}
         >
           <Unlink size={12} />
-          Unlink
+          {cm.unlink}
         </button>
       )}
 
@@ -178,7 +186,7 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
         onMouseEnter={() => setOpenSub('speed')}
       >
         <div style={itemStyle}>
-          <span style={{ flex: 1 }}>Speed</span>
+          <span style={{ flex: 1 }}>{cm.speed}</span>
           <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
             {clipSpeed}x
           </span>
@@ -196,7 +204,7 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
                 }}
                 onClick={() => handleAction(() => setClipSpeed(clipId, opt.value))}
               >
-                {opt.label}
+                {speedLabel(opt)}
               </button>
             ))}
           </div>
@@ -210,9 +218,9 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
           onMouseEnter={() => setOpenSub('fitMode')}
         >
           <div style={itemStyle}>
-            <span style={{ flex: 1 }}>Fit Mode</span>
+            <span style={{ flex: 1 }}>{cm.fitMode}</span>
             <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-              {clipFitMode.charAt(0).toUpperCase() + clipFitMode.slice(1)}
+              {clipFitMode === 'fit' ? cm.fitLetterbox.split(' ')[0] : clipFitMode === 'fill' ? cm.fillCrop.split(' ')[0] : cm.stretch}
             </span>
             <ChevronRight size={10} />
           </div>
@@ -228,7 +236,7 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
                   }}
                   onClick={() => handleAction(() => setClipFitMode(clipId, mode))}
                 >
-                  {mode === 'fit' ? 'Fit (Letterbox)' : mode === 'fill' ? 'Fill (Crop)' : 'Stretch'}
+                  {mode === 'fit' ? cm.fitLetterbox : mode === 'fill' ? cm.fillCrop : cm.stretch}
                 </button>
               ))}
             </div>
@@ -239,7 +247,7 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
       {/* Scale slider (video only) */}
       {isVideo && (
         <div style={{ ...itemStyle, cursor: 'default' }} onMouseEnter={() => setOpenSub(null)}>
-          <span style={{ fontSize: 12 }}>Scale</span>
+          <span style={{ fontSize: 12 }}>{cm.scale}</span>
           <input
             type="range"
             min={10}
@@ -262,9 +270,9 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
           onMouseEnter={() => setOpenSub('animation')}
         >
           <div style={itemStyle}>
-            <span style={{ flex: 1 }}>Animation</span>
+            <span style={{ flex: 1 }}>{cm.animation}</span>
             <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-              {ANIMATION_PRESETS.find((p) => p.value === clipAnimationPreset)?.label ?? 'None'}
+              {cm[ANIMATION_PRESETS.find((p) => p.value === clipAnimationPreset)?.key as keyof typeof cm] ?? cm.animNone}
             </span>
             <ChevronRight size={10} />
           </div>
@@ -287,7 +295,7 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
                     )
                   }
                 >
-                  {opt.label}
+                  {cm[opt.key as keyof typeof cm]}
                 </button>
               ))}
             </div>
@@ -301,9 +309,9 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
         onMouseEnter={() => setOpenSub('fadeIn')}
       >
         <div style={itemStyle}>
-          <span style={{ flex: 1 }}>Fade In</span>
+          <span style={{ flex: 1 }}>{cm.fadeIn}</span>
           <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-            {clip.fadeIn > 0 ? `${clip.fadeIn}s` : 'None'}
+            {clip.fadeIn > 0 ? `${clip.fadeIn}s` : cm.none}
           </span>
           <ChevronRight size={10} />
         </div>
@@ -319,7 +327,7 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
                 }}
                 onClick={() => handleAction(() => setClipFade(clipId, 'in', opt.value))}
               >
-                {opt.label}
+                {fadeLabel(opt.value)}
               </button>
             ))}
           </div>
@@ -332,9 +340,9 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
         onMouseEnter={() => setOpenSub('fadeOut')}
       >
         <div style={itemStyle}>
-          <span style={{ flex: 1 }}>Fade Out</span>
+          <span style={{ flex: 1 }}>{cm.fadeOut}</span>
           <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-            {clip.fadeOut > 0 ? `${clip.fadeOut}s` : 'None'}
+            {clip.fadeOut > 0 ? `${clip.fadeOut}s` : cm.none}
           </span>
           <ChevronRight size={10} />
         </div>
@@ -350,7 +358,7 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
                 }}
                 onClick={() => handleAction(() => setClipFade(clipId, 'out', opt.value))}
               >
-                {opt.label}
+                {fadeLabel(opt.value)}
               </button>
             ))}
           </div>
@@ -366,9 +374,9 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
           onMouseEnter={() => setOpenSub('transIn')}
         >
           <div style={itemStyle}>
-            <span style={{ flex: 1 }}>Transition In</span>
+            <span style={{ flex: 1 }}>{cm.transitionIn}</span>
             <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-              {clip.transitionIn?.type ?? 'None'}
+              {clip.transitionIn ? (cm[TRANSITION_TYPES.find((tt) => tt.value === clip.transitionIn?.type)?.key as keyof typeof cm] ?? cm.none) : cm.none}
             </span>
             <ChevronRight size={10} />
           </div>
@@ -382,21 +390,21 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
                 }}
                 onClick={() => handleAction(() => setClipTransition(clipId, 'in', undefined))}
               >
-                None
+                {cm.none}
               </button>
-              {TRANSITION_TYPES.map((t) => (
+              {TRANSITION_TYPES.map((tt) => (
                 <button
-                  key={t.value}
+                  key={tt.value}
                   style={{
                     ...itemStyle,
-                    fontWeight: clip.transitionIn?.type === t.value ? 'bold' : 'normal',
-                    color: clip.transitionIn?.type === t.value ? 'var(--accent)' : 'var(--text-primary)',
+                    fontWeight: clip.transitionIn?.type === tt.value ? 'bold' : 'normal',
+                    color: clip.transitionIn?.type === tt.value ? 'var(--accent)' : 'var(--text-primary)',
                   }}
                   onClick={() =>
-                    handleAction(() => setClipTransition(clipId, 'in', { type: t.value, duration: 0.5 }))
+                    handleAction(() => setClipTransition(clipId, 'in', { type: tt.value, duration: 0.5 }))
                   }
                 >
-                  {t.label}
+                  {cm[tt.key as keyof typeof cm]}
                 </button>
               ))}
             </div>
@@ -411,9 +419,9 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
           onMouseEnter={() => setOpenSub('transOut')}
         >
           <div style={itemStyle}>
-            <span style={{ flex: 1 }}>Transition Out</span>
+            <span style={{ flex: 1 }}>{cm.transitionOut}</span>
             <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-              {clip.transitionOut?.type ?? 'None'}
+              {clip.transitionOut ? (cm[TRANSITION_TYPES.find((tt) => tt.value === clip.transitionOut?.type)?.key as keyof typeof cm] ?? cm.none) : cm.none}
             </span>
             <ChevronRight size={10} />
           </div>
@@ -427,21 +435,21 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
                 }}
                 onClick={() => handleAction(() => setClipTransition(clipId, 'out', undefined))}
               >
-                None
+                {cm.none}
               </button>
-              {TRANSITION_TYPES.map((t) => (
+              {TRANSITION_TYPES.map((tt) => (
                 <button
-                  key={t.value}
+                  key={tt.value}
                   style={{
                     ...itemStyle,
-                    fontWeight: clip.transitionOut?.type === t.value ? 'bold' : 'normal',
-                    color: clip.transitionOut?.type === t.value ? 'var(--accent)' : 'var(--text-primary)',
+                    fontWeight: clip.transitionOut?.type === tt.value ? 'bold' : 'normal',
+                    color: clip.transitionOut?.type === tt.value ? 'var(--accent)' : 'var(--text-primary)',
                   }}
                   onClick={() =>
-                    handleAction(() => setClipTransition(clipId, 'out', { type: t.value, duration: 0.5 }))
+                    handleAction(() => setClipTransition(clipId, 'out', { type: tt.value, duration: 0.5 }))
                   }
                 >
-                  {t.label}
+                  {cm[tt.key as keyof typeof cm]}
                 </button>
               ))}
             </div>
@@ -453,7 +461,7 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
 
       {/* Volume slider */}
       <div style={{ ...itemStyle, cursor: 'default' }} onMouseEnter={() => setOpenSub(null)}>
-        <span style={{ fontSize: 12 }}>Volume</span>
+        <span style={{ fontSize: 12 }}>{cm.volume}</span>
         <input
           type="range"
           min={0}
@@ -477,7 +485,7 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
         onMouseEnter={() => setOpenSub(null)}
       >
         <Scissors size={12} />
-        Delete Clip
+        {cm.deleteClip}
       </button>
     </div>
   );

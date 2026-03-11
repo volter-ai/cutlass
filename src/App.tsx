@@ -15,6 +15,7 @@ import { useTimelineStore, useTimelineStoreApi } from './store/timeline';
 import { autoSaveLocal, loadAutoSave, deserializeProject } from './services/projects';
 import { getMediaFile } from './services/mediaStorage';
 import { createMediaFile } from './utils/media';
+import { useLanguage } from './context/LanguageProvider';
 
 const TABS = ['media', 'transcript', 'settings'] as const;
 
@@ -28,6 +29,13 @@ export default function App() {
   const storeApi = useTimelineStoreApi();
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasRestoredRef = useRef(false);
+  const { t } = useLanguage();
+
+  const tabLabels: Record<(typeof TABS)[number], string> = {
+    media: t.tabs.media,
+    transcript: t.tabs.transcript,
+    settings: t.tabs.settings,
+  };
 
   // Auto-restore from localStorage on first mount
   useEffect(() => {
@@ -113,7 +121,7 @@ export default function App() {
                   borderBottom: leftPanelTab === tab ? '2px solid var(--accent)' : '2px solid transparent',
                 }}
               >
-                {tab}
+                {tabLabels[tab]}
               </button>
             ))}
           </div>

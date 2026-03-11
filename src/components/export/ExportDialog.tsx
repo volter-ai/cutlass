@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { X, Download, Loader2, AlertTriangle } from 'lucide-react';
 import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { exportTimeline, downloadBlob } from '../../services/export';
+import { useLanguage } from '../../context/LanguageProvider';
 import type { ExportSettings } from '../../types';
 
 const QUALITY_OPTIONS: { value: ExportSettings['quality']; label: string }[] = [
@@ -14,6 +15,7 @@ export function ExportDialog() {
   const { showExportDialog, setShowExportDialog, isExporting, exportProgress, settings } =
     useTimelineStore();
   const storeApi = useTimelineStoreApi();
+  const { t } = useLanguage();
 
   const [exportSettings, setExportSettings] = useState<ExportSettings>({
     format: 'mp4',
@@ -39,11 +41,11 @@ export function ExportDialog() {
     } catch (err) {
       console.error('Export failed:', err);
       const message = err instanceof Error ? err.message : String(err);
-      setExportError(message || 'Export failed. Check the browser console for details.');
+      setExportError(message || t.export.exportFailed);
     } finally {
       storeApi.getState().setIsExporting(false);
     }
-  }, [storeApi, exportSettings]);
+  }, [storeApi, exportSettings, t]);
 
   if (!showExportDialog) return null;
 
@@ -55,7 +57,7 @@ export function ExportDialog() {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
-          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Export Video</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{t.export.title}</span>
           <button
             onClick={() => setShowExportDialog(false)}
             className="p-1 rounded hover:opacity-80"
@@ -69,7 +71,7 @@ export function ExportDialog() {
         <div className="p-4 space-y-4">
           {/* Format */}
           <div>
-            <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Format</label>
+            <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>{t.export.format}</label>
             <div className="flex gap-2">
               {(['mp4', 'webm'] as const).map((fmt) => (
                 <button
@@ -89,7 +91,7 @@ export function ExportDialog() {
 
           {/* Quality */}
           <div>
-            <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Quality</label>
+            <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>{t.export.quality}</label>
             <div className="flex gap-2">
               {QUALITY_OPTIONS.map(({ value, label }) => (
                 <button
@@ -109,7 +111,7 @@ export function ExportDialog() {
 
           {/* Resolution info */}
           <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-            Resolution: {settings.resolution.width}x{settings.resolution.height} ({settings.aspectRatio})
+            {t.export.resolution}: {settings.resolution.width}x{settings.resolution.height} ({settings.aspectRatio})
           </div>
 
           {/* Toggles */}
@@ -121,7 +123,7 @@ export function ExportDialog() {
                 onChange={(e) => setExportSettings((s) => ({ ...s, includeAudio: e.target.checked }))}
                 className="rounded"
               />
-              Include audio
+              {t.export.includeAudio}
             </label>
             <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-primary)' }}>
               <input
@@ -130,7 +132,7 @@ export function ExportDialog() {
                 onChange={(e) => setExportSettings((s) => ({ ...s, burnCaptions: e.target.checked }))}
                 className="rounded"
               />
-              Burn captions into video
+              {t.export.burnCaptions}
             </label>
           </div>
 
@@ -146,7 +148,7 @@ export function ExportDialog() {
           {isExporting && (
             <div>
               <div className="flex items-center justify-between text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
-                <span>Exporting...</span>
+                <span>{t.export.exporting}</span>
                 <span>{Math.round(exportProgress)}%</span>
               </div>
               <div className="w-full h-2 rounded-full" style={{ background: 'var(--bg-surface)' }}>
@@ -167,7 +169,7 @@ export function ExportDialog() {
             style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)' }}
             disabled={isExporting}
           >
-            Cancel
+            {t.export.cancel}
           </button>
           <button
             onClick={handleExport}
@@ -180,7 +182,7 @@ export function ExportDialog() {
             }}
           >
             {isExporting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-            {isExporting ? 'Exporting...' : 'Export'}
+            {isExporting ? t.export.exporting : t.export.exportBtn}
           </button>
         </div>
       </div>

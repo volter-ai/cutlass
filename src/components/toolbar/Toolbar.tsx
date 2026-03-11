@@ -18,7 +18,9 @@ import {
 import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { formatTimecode } from '../../utils/time';
 import { UserMenu } from '../auth/UserMenu';
+import { useLanguage } from '../../context/LanguageProvider';
 import type { Tool } from '../../types';
+import type { Locale } from '../../i18n';
 
 export function Toolbar() {
   const {
@@ -43,11 +45,12 @@ export function Toolbar() {
 
   const storeApi = useTimelineStoreApi();
   const temporal = storeApi.temporal.getState();
+  const { t, locale, setLocale } = useLanguage();
 
   const tools: { tool: Tool; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
-    { tool: 'select', icon: MousePointer2, label: 'Select', shortcut: 'V' },
-    { tool: 'razor', icon: Scissors, label: 'Razor', shortcut: 'C' },
-    { tool: 'text', icon: Type, label: 'Text', shortcut: 'T' },
+    { tool: 'select', icon: MousePointer2, label: t.toolbar.select, shortcut: 'V' },
+    { tool: 'razor', icon: Scissors, label: t.toolbar.razor, shortcut: 'C' },
+    { tool: 'text', icon: Type, label: t.toolbar.text, shortcut: 'T' },
   ];
 
   return (
@@ -71,7 +74,7 @@ export function Toolbar() {
         onClick={() => setShowProjectsModal(true)}
         className="p-1.5 rounded transition-colors hover:opacity-80"
         style={{ color: 'var(--text-secondary)' }}
-        title="Projects (Cmd+O)"
+        title={t.toolbar.projects}
       >
         <FolderOpen size={14} />
       </button>
@@ -105,10 +108,10 @@ export function Toolbar() {
             background: snapEnabled ? 'var(--scene-border)' : 'transparent',
             color: snapEnabled ? 'white' : 'var(--text-secondary)',
           }}
-          title={`Snap ${snapEnabled ? 'On' : 'Off'} (S)`}
+          title={`${snapEnabled ? t.toolbar.snapOn : t.toolbar.snapOff} (S)`}
         >
           <Magnet size={14} />
-          Snap
+          {t.toolbar.snap}
         </button>
       </div>
 
@@ -121,7 +124,7 @@ export function Toolbar() {
           onClick={() => setPlayheadPosition(0)}
           className="p-1.5 rounded transition-colors hover:opacity-80"
           style={{ color: 'var(--text-secondary)' }}
-          title="Go to start"
+          title={t.toolbar.goToStart}
         >
           <SkipBack size={14} />
         </button>
@@ -132,7 +135,7 @@ export function Toolbar() {
             background: isPlaying ? 'var(--playhead)' : 'var(--accent)',
             color: 'white',
           }}
-          title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+          title={isPlaying ? t.toolbar.pause : t.toolbar.play}
         >
           {isPlaying ? <Pause size={14} /> : <Play size={14} />}
         </button>
@@ -140,7 +143,7 @@ export function Toolbar() {
           onClick={() => setPlayheadPosition(duration)}
           className="p-1.5 rounded transition-colors hover:opacity-80"
           style={{ color: 'var(--text-secondary)' }}
-          title="Go to end"
+          title={t.toolbar.goToEnd}
         >
           <SkipForward size={14} />
         </button>
@@ -172,7 +175,7 @@ export function Toolbar() {
         style={{ background: 'var(--accent)', color: 'white' }}
       >
         <Download size={12} />
-        Export
+        {t.toolbar.export}
       </button>
 
       {/* Divider */}
@@ -184,7 +187,7 @@ export function Toolbar() {
           onClick={() => temporal.undo()}
           className="p-1.5 rounded transition-colors hover:opacity-80"
           style={{ color: 'var(--text-secondary)' }}
-          title="Undo (Cmd+Z)"
+          title={t.toolbar.undo}
         >
           <Undo2 size={14} />
         </button>
@@ -192,7 +195,7 @@ export function Toolbar() {
           onClick={() => temporal.redo()}
           className="p-1.5 rounded transition-colors hover:opacity-80"
           style={{ color: 'var(--text-secondary)' }}
-          title="Redo (Cmd+Shift+Z)"
+          title={t.toolbar.redo}
         >
           <Redo2 size={14} />
         </button>
@@ -207,7 +210,7 @@ export function Toolbar() {
           onClick={() => setZoom(zoom / 1.2)}
           className="p-1.5 rounded transition-colors hover:opacity-80"
           style={{ color: 'var(--text-secondary)' }}
-          title="Zoom out"
+          title={t.toolbar.zoomOut}
         >
           <ZoomOut size={14} />
         </button>
@@ -218,7 +221,7 @@ export function Toolbar() {
           onClick={() => setZoom(zoom * 1.2)}
           className="p-1.5 rounded transition-colors hover:opacity-80"
           style={{ color: 'var(--text-secondary)' }}
-          title="Zoom in"
+          title={t.toolbar.zoomIn}
         >
           <ZoomIn size={14} />
         </button>
@@ -227,12 +230,29 @@ export function Toolbar() {
       {/* Divider */}
       <div className="w-px h-6" style={{ background: 'var(--border)' }} />
 
+      {/* Language Toggle */}
+      <div className="flex items-center rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+        {(['en', 'es'] as Locale[]).map((l) => (
+          <button
+            key={l}
+            onClick={() => setLocale(l)}
+            className="px-1.5 py-0.5 text-xs font-semibold uppercase transition-colors"
+            style={{
+              background: locale === l ? 'var(--accent)' : 'transparent',
+              color: locale === l ? 'white' : 'var(--text-secondary)',
+            }}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+
       {/* Help */}
       <button
         onClick={() => setShowHelpOverlay(true)}
         className="p-1.5 rounded transition-colors hover:opacity-80"
         style={{ color: 'var(--text-secondary)' }}
-        title="Help (?)"
+        title={t.toolbar.help}
       >
         <HelpCircle size={14} />
       </button>

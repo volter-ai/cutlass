@@ -3,9 +3,11 @@ import { Film, Music, Image, Upload, Trash2 } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { createMediaFile } from '../../utils/media';
 import { formatDuration } from '../../utils/time';
+import { useLanguage } from '../../context/LanguageProvider';
 
 export function MediaBin() {
   const { mediaFiles, addMediaFile, removeMediaFile } = useTimelineStore();
+  const { t } = useLanguage();
 
   const handleFileImport = useCallback(async () => {
     const input = document.createElement('input');
@@ -70,7 +72,7 @@ export function MediaBin() {
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border)' }}>
         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-          Media
+          {t.mediaBin.title}
         </span>
         <button
           onClick={handleFileImport}
@@ -78,7 +80,7 @@ export function MediaBin() {
           style={{ background: 'var(--accent)', color: 'white' }}
         >
           <Upload size={12} />
-          Import
+          {t.mediaBin.import}
         </button>
       </div>
 
@@ -90,8 +92,8 @@ export function MediaBin() {
             style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
           >
             <Upload size={32} className="mb-2 opacity-50" />
-            <p className="text-sm">Drop media files here</p>
-            <p className="text-xs mt-1">or click Import</p>
+            <p className="text-sm">{t.mediaBin.dropFiles}</p>
+            <p className="text-xs mt-1">{t.mediaBin.orClickImport}</p>
           </div>
         ) : (
           <div className="flex flex-col gap-1">
@@ -103,7 +105,6 @@ export function MediaBin() {
                 className="flex items-center gap-2 p-2 rounded cursor-grab active:cursor-grabbing transition-colors group"
                 style={{ background: 'var(--bg-surface)' }}
               >
-                {/* Thumbnail */}
                 {media.thumbnail ? (
                   <img
                     src={media.thumbnail}
@@ -119,7 +120,6 @@ export function MediaBin() {
                   </div>
                 )}
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs truncate" style={{ color: 'var(--text-primary)' }}>
                     {media.name}
@@ -129,7 +129,6 @@ export function MediaBin() {
                   </p>
                 </div>
 
-                {/* Delete */}
                 <button
                   onClick={() => removeMediaFile(media.id)}
                   className="opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity hover:opacity-80"

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { transcribeMedia } from '../../services/transcription';
+import { useLanguage } from '../../context/LanguageProvider';
 import type { FillerRemovalMode } from '../../types';
 
 export function TranscriptPanel() {
@@ -22,6 +23,7 @@ export function TranscriptPanel() {
     setPlayheadPosition,
     settings,
   } = useTimelineStore();
+  const { t } = useLanguage();
 
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [fillerMode, setFillerMode] = useState<FillerRemovalMode>('delete');
@@ -74,12 +76,19 @@ export function TranscriptPanel() {
       )
     : 0;
 
+  const fillerModeOptions: { value: FillerRemovalMode; label: string }[] = [
+    { value: 'delete', label: t.transcript.delete },
+    { value: 'gap', label: t.transcript.replaceWithGap },
+    { value: 'ignore', label: t.transcript.ignore },
+    { value: 'transcript-only', label: t.transcript.transcriptOnly },
+  ];
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border)' }}>
         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-          Transcript
+          {t.transcript.title}
         </span>
       </div>
 
@@ -99,10 +108,10 @@ export function TranscriptPanel() {
               setActiveTranscriptMediaId(id || null);
             }}
           >
-            <option value="">Select media to transcribe...</option>
+            <option value="">{t.transcript.selectMedia}</option>
             {mediaList.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.name} {transcripts[m.id] ? '(transcribed)' : ''}
+                {m.name} {transcripts[m.id] ? t.transcript.transcribed : ''}
               </option>
             ))}
           </select>
@@ -121,12 +130,12 @@ export function TranscriptPanel() {
               {isTranscribing ? (
                 <>
                   <Loader2 size={12} className="animate-spin" />
-                  Transcribing...
+                  {t.transcript.transcribing}
                 </>
               ) : (
                 <>
                   <FileText size={12} />
-                  Transcribe
+                  {t.transcript.transcribe}
                 </>
               )}
             </button>
@@ -149,10 +158,9 @@ export function TranscriptPanel() {
               value={fillerMode}
               onChange={(e) => setFillerMode(e.target.value as FillerRemovalMode)}
             >
-              <option value="delete">Delete</option>
-              <option value="gap">Replace with gap</option>
-              <option value="ignore">Ignore</option>
-              <option value="transcript-only">Transcript only</option>
+              {fillerModeOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
             <button
               onClick={handleRemoveFillers}
@@ -161,10 +169,10 @@ export function TranscriptPanel() {
                 background: fillerCount > 0 ? 'var(--filler-highlight)' : 'var(--bg-surface)',
                 color: fillerCount > 0 ? '#000' : 'var(--text-secondary)',
               }}
-              title="Remove filler words (um, uh, etc.)"
+              title={t.transcript.fillersTooltip}
             >
               <Wand2 size={11} />
-              Fillers ({fillerCount})
+              {t.transcript.fillers} ({fillerCount})
             </button>
           </div>
 
@@ -173,10 +181,10 @@ export function TranscriptPanel() {
             onClick={handleDetectScenes}
             className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors hover:opacity-80"
             style={{ background: 'var(--scene-border)', color: 'white' }}
-            title="Detect scenes from transcript"
+            title={t.transcript.detectScenesTooltip}
           >
             <Layers size={11} />
-            Detect Scenes
+            {t.transcript.detectScenes}
           </button>
         </div>
       )}
@@ -188,8 +196,8 @@ export function TranscriptPanel() {
             <Sparkles size={32} className="mb-2 opacity-50" />
             <p className="text-sm text-center">
               {mediaList.length === 0
-                ? 'Import media to get started'
-                : 'Select media and transcribe'}
+                ? t.transcript.importToStart
+                : t.transcript.selectAndTranscribe}
             </p>
           </div>
         ) : (
@@ -198,7 +206,7 @@ export function TranscriptPanel() {
             {activeTranscript.scenes.length > 0 && (
               <div className="mb-3">
                 <p className="text-xs font-semibold mb-1" style={{ color: 'var(--scene-border)' }}>
-                  Scenes ({activeTranscript.scenes.length})
+                  {t.transcript.scenes} ({activeTranscript.scenes.length})
                 </p>
                 <div className="flex flex-wrap gap-1">
                   {activeTranscript.scenes.map((scene) => (
@@ -221,7 +229,7 @@ export function TranscriptPanel() {
                 {/* Speaker label */}
                 {segment.speaker !== undefined && (
                   <span className="text-xs font-semibold mr-1" style={{ color: 'var(--accent)' }}>
-                    Speaker {segment.speaker + 1}:
+                    {t.transcript.speaker} {segment.speaker + 1}:
                   </span>
                 )}
 

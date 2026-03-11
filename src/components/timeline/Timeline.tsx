@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
+import { useLanguage } from '../../context/LanguageProvider';
 import { TimelineRuler } from './TimelineRuler';
 import { TimelineTrack } from './TimelineTrack';
 
@@ -25,6 +26,7 @@ export function Timeline() {
   const addTrack = useTimelineStore((s) => s.addTrack);
   const selectClips = useTimelineStore((s) => s.selectClips);
   const clearSelection = useTimelineStore((s) => s.clearSelection);
+  const { t } = useLanguage();
 
   const videoTracks = tracks.filter((t) => t.type === 'video');
   const audioTracks = tracks.filter((t) => t.type === 'audio');
@@ -173,7 +175,7 @@ export function Timeline() {
         style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}
       >
         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-          Timeline
+          {t.timeline.title}
         </span>
         <div className="flex gap-1">
           <button
@@ -181,21 +183,21 @@ export function Timeline() {
             className="flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors hover:opacity-80"
             style={{ color: 'var(--bg-clip-video)', border: '1px solid var(--bg-clip-video)' }}
           >
-            <Plus size={10} /> Video
+            <Plus size={10} /> {t.timeline.video}
           </button>
           <button
             onClick={() => addTrack('audio')}
             className="flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors hover:opacity-80"
             style={{ color: 'var(--bg-clip-audio)', border: '1px solid var(--bg-clip-audio)' }}
           >
-            <Plus size={10} /> Audio
+            <Plus size={10} /> {t.timeline.audio}
           </button>
           <button
             onClick={() => addTrack('text')}
             className="flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors hover:opacity-80"
             style={{ color: 'var(--filler-highlight)', border: '1px solid var(--filler-highlight)' }}
           >
-            <Plus size={10} /> Text
+            <Plus size={10} /> {t.timeline.text}
           </button>
         </div>
       </div>

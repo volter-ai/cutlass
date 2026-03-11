@@ -14,6 +14,7 @@ import {
 } from '../../services/projects';
 import { getMediaFile } from '../../services/mediaStorage';
 import { createMediaFile } from '../../utils/media';
+import { useLanguage } from '../../context/LanguageProvider';
 import type { Project } from '../../types';
 
 export function ProjectsModal() {
@@ -24,6 +25,7 @@ export function ProjectsModal() {
   const { user } = useAuth();
   const storeApi = useTimelineStoreApi();
   const panelRef = useRef<HTMLDivElement>(null);
+  const { t } = useLanguage();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,7 +70,6 @@ export function ProjectsModal() {
   if (!show) return null;
 
   const handleNew = async () => {
-    // Save current project first if it exists
     if (store.currentProjectId) {
       try {
         await saveProject(store.currentProjectId, store.currentProjectName, store);
@@ -163,9 +164,9 @@ export function ProjectsModal() {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
           <div>
-            <h2 className="text-sm font-bold">Projects</h2>
+            <h2 className="text-sm font-bold">{t.projects.title}</h2>
             {!isSupabaseConfigured() && (
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Saved locally in this browser</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{t.projects.savedLocally}</p>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -176,7 +177,7 @@ export function ProjectsModal() {
                 style={{ background: 'var(--accent)', color: 'white' }}
               >
                 <Plus size={12} />
-                New
+                {t.projects.new}
               </button>
             )}
             <button onClick={() => setShow(false)} className="p-1 rounded hover:opacity-80" style={{ color: 'var(--text-secondary)' }}>
@@ -191,21 +192,21 @@ export function ProjectsModal() {
             <div className="p-8 text-center">
               <FolderOpen size={32} className="mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
               <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                Sign in to save and manage projects across sessions.
+                {t.projects.signInToSave}
               </p>
             </div>
           ) : loading ? (
             <div className="p-8 text-center">
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Loading projects...</p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{t.projects.loadingProjects}</p>
             </div>
           ) : projects.length === 0 ? (
             <div className="p-8 text-center">
               <FolderOpen size={32} className="mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
               <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>
-                No projects yet. Click "New" to create one.
+                {t.projects.noProjects}
               </p>
               <p className="text-xs" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
-                Your current session auto-saves every few seconds.
+                {t.projects.autoSaveHint}
               </p>
             </div>
           ) : (
@@ -246,7 +247,7 @@ export function ProjectsModal() {
                       onClick={(e) => { e.stopPropagation(); setRenamingId(project.id); setRenameValue(project.name); }}
                       className="p-1 rounded hover:opacity-80"
                       style={{ color: 'var(--text-secondary)' }}
-                      title="Rename"
+                      title={t.projects.rename}
                     >
                       <Edit3 size={12} />
                     </button>
@@ -254,7 +255,7 @@ export function ProjectsModal() {
                       onClick={(e) => { e.stopPropagation(); handleDelete(project.id); }}
                       className="p-1 rounded hover:opacity-80"
                       style={{ color: 'var(--playhead)' }}
-                      title="Delete"
+                      title={t.projects.delete}
                     >
                       <Trash2 size={12} />
                     </button>
