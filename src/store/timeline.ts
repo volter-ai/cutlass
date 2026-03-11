@@ -290,7 +290,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           get().recalculateDuration();
         },
 
-        moveClip: (clipId, newStartTime, newTrackId) =>
+        moveClip: (clipId, newStartTime, newTrackId) => {
           set((state) => {
             const clip = state.clips[clipId];
             if (!clip) return;
@@ -307,9 +307,11 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                 linked.startTime = Math.max(0, linked.startTime + delta);
               }
             }
-          }),
+          });
+          get().recalculateDuration();
+        },
 
-        moveClipsBatch: (positions) =>
+        moveClipsBatch: (positions) => {
           set((state) => {
             const processed = new Set<string>();
             for (const [clipId, newStartTime] of Object.entries(positions)) {
@@ -329,7 +331,9 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                 }
               }
             }
-          }),
+          });
+          get().recalculateDuration();
+        },
 
         trimClipStart: (clipId, newStartTime) =>
           set((state) => {

@@ -26,6 +26,7 @@ export function TranscriptPanel() {
   const { t } = useLanguage();
 
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   const [fillerMode, setFillerMode] = useState<FillerRemovalMode>('delete');
 
   const mediaList = Object.values(mediaFiles).filter((m) => m.type === 'video' || m.type === 'audio');
@@ -36,6 +37,7 @@ export function TranscriptPanel() {
   const handleTranscribe = useCallback(
     async (mediaFileId: string) => {
       setIsTranscribing(true);
+      setTranscriptionError(null);
       try {
         const media = mediaFiles[mediaFileId];
         if (!media) return;
@@ -44,6 +46,7 @@ export function TranscriptPanel() {
         setActiveTranscriptMediaId(mediaFileId);
       } catch (err) {
         console.error('Transcription failed:', err);
+        setTranscriptionError(err instanceof Error ? err.message : 'Transcription failed');
       } finally {
         setIsTranscribing(false);
       }
@@ -117,28 +120,35 @@ export function TranscriptPanel() {
           </select>
 
           {activeTranscriptMediaId && !transcripts[activeTranscriptMediaId] && (
-            <button
-              onClick={() => handleTranscribe(activeTranscriptMediaId)}
-              disabled={isTranscribing}
-              className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs transition-colors"
-              style={{
-                background: 'var(--accent)',
-                color: 'white',
-                opacity: isTranscribing ? 0.6 : 1,
-              }}
-            >
-              {isTranscribing ? (
-                <>
-                  <Loader2 size={12} className="animate-spin" />
-                  {t.transcript.transcribing}
-                </>
-              ) : (
-                <>
-                  <FileText size={12} />
-                  {t.transcript.transcribe}
-                </>
+            <>
+              <button
+                onClick={() => handleTranscribe(activeTranscriptMediaId)}
+                disabled={isTranscribing}
+                className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs transition-colors"
+                style={{
+                  background: 'var(--accent)',
+                  color: 'white',
+                  opacity: isTranscribing ? 0.6 : 1,
+                }}
+              >
+                {isTranscribing ? (
+                  <>
+                    <Loader2 size={12} className="animate-spin" />
+                    {t.transcript.transcribing}
+                  </>
+                ) : (
+                  <>
+                    <FileText size={12} />
+                    {t.transcript.transcribe}
+                  </>
+                )}
+              </button>
+              {transcriptionError && (
+                <p className="mt-1 text-xs px-1" style={{ color: '#ef4444' }}>
+                  {transcriptionError}
+                </p>
               )}
-            </button>
+            </>
           )}
         </div>
       )}

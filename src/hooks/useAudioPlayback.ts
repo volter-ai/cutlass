@@ -138,8 +138,9 @@ export function useAudioPlayback() {
     }
 
     // Cleanup audio elements for removed clips
+    const audioClipIds = new Set(audioClips.map((c) => c.id));
     for (const [clipId, source] of sources) {
-      if (!activeClipIds.has(clipId) && !audioClips.some((c) => c.id === clipId)) {
+      if (!audioClipIds.has(clipId)) {
         source.element.pause();
         source.element.src = '';
         sources.delete(clipId);
