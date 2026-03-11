@@ -174,7 +174,7 @@ export async function exportTimeline(
       );
     }
 
-    // Apply clip animation effects (fade-based)
+    // Apply clip animation effects
     let animLabel = scaledLabel;
     const anim = clip.animation?.preset;
     if (anim && anim !== 'none') {
@@ -182,6 +182,9 @@ export async function exportTimeline(
       const dur = clip.duration;
       const fadeInDur = Math.min(dur / 3, 1);
       const fadeOutDur = Math.min(dur / 3, 1);
+      const totalFrames = Math.max(1, Math.round(dur * frameRate));
+      const W = resolution.width;
+      const H = resolution.height;
 
       if (anim === 'fade-in') {
         filterParts.push(`[${animLabel}]fade=t=in:st=0:d=${fadeInDur}[${animOut}]`);
@@ -192,9 +195,26 @@ export async function exportTimeline(
       } else if (anim === 'fade-in-out') {
         filterParts.push(`[${animLabel}]fade=t=in:st=0:d=${fadeInDur},fade=t=out:st=${dur - fadeOutDur}:d=${fadeOutDur}[${animOut}]`);
         animLabel = animOut;
+      } else if (anim === 'zoom-in') {
+        // 1.0x → 1.3x zoom, keeping center (matches Viewer CSS scale 1.0→1.3)
+        filterParts.push(
+          `[${animLabel}]zoompan=z='min(1+0.3*on/${totalFrames},1.3)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${totalFrames}:s=${W}x${H}:fps=${frameRate}[${animOut}]`,
+        );
+        animLabel = animOut;
+      } else if (anim === 'zoom-out') {
+        // 1.3x → 1.0x zoom, keeping center (matches Viewer CSS scale 1.3→1.0)
+        filterParts.push(
+          `[${animLabel}]zoompan=z='max(1.3-0.3*on/${totalFrames},1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${totalFrames}:s=${W}x${H}:fps=${frameRate}[${animOut}]`,
+        );
+        animLabel = animOut;
+      } else if (anim === 'ken-burns') {
+        // 1.0x → 1.2x zoom with 5% rightward and 3% upward pan (matches Viewer CSS)
+        filterParts.push(
+          `[${animLabel}]zoompan=z='min(1+0.2*on/${totalFrames},1.2)':x='iw/2+on/${totalFrames}*0.05*iw-(iw/zoom/2)':y='ih/2-on/${totalFrames}*0.03*ih-(ih/zoom/2)':d=${totalFrames}:s=${W}x${H}:fps=${frameRate}[${animOut}]`,
+        );
+        animLabel = animOut;
       }
-      // zoom-in, zoom-out, ken-burns use CSS transforms in the Viewer preview;
-      // exporting them would require zoompan filters which are complex to implement
+      // slide-* animations remain preview-only
     }
 
     // Apply transitionIn / transitionOut fade filters before overlaying
