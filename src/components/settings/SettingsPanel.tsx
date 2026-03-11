@@ -9,7 +9,7 @@ const FONT_FAMILIES = [
 ];
 
 export function SettingsPanel() {
-  const { settings, setAspectRatio, setDeepgramApiKey, setCaptionStyle } = useTimelineStore();
+  const { settings, setAspectRatio, setDeepgramApiKey, setOpenaiApiKey, setCaptionStyle } = useTimelineStore();
   const selectedTextOverlayId = useTimelineStore((s) => s.selectedTextOverlayId);
   const textOverlays = useTimelineStore((s) => s.textOverlays);
   const updateTextOverlay = useTimelineStore((s) => s.updateTextOverlay);
@@ -115,6 +115,29 @@ export function SettingsPanel() {
           />
           <p className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
             {settings.deepgramApiKey ? t.settings.keySet : t.settings.noKey}
+          </p>
+        </section>
+
+        {/* OpenAI API Key */}
+        <section>
+          <div className="flex items-center gap-1.5 mb-2">
+            <Key size={12} style={{ color: 'var(--accent)' }} />
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{t.settings.openaiKey ?? 'OpenAI API Key'}</span>
+          </div>
+          <input
+            type="password"
+            value={settings.openaiApiKey}
+            onChange={(e) => setOpenaiApiKey(e.target.value)}
+            placeholder={t.settings.openaiKeyPlaceholder ?? 'Enter API key for AI editing...'}
+            className="w-full text-xs px-2.5 py-1.5 rounded border"
+            style={{
+              background: 'var(--bg-surface)',
+              borderColor: 'var(--border)',
+              color: 'var(--text-primary)',
+            }}
+          />
+          <p className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+            {settings.openaiApiKey ? (t.settings.openaiKeySet ?? 'Key set - AI editing enabled') : (t.settings.noOpenaiKey ?? 'No key - AI features disabled')}
           </p>
         </section>
 

@@ -18,12 +18,14 @@ export const en = {
     zoomOut: 'Zoom out',
     help: 'Help (?)',
     projects: 'Projects (Cmd+O)',
+    aiEdit: 'AI Edit',
   },
 
   // App tabs
   tabs: {
     media: 'media',
     transcript: 'transcript',
+    ai: 'AI',
     settings: 'settings',
   },
 
@@ -152,6 +154,11 @@ export const en = {
     bgColor: 'Background',
     textAlign: 'Align',
     textOutline: 'Outline',
+    // OpenAI
+    openaiKey: 'OpenAI API Key',
+    openaiKeyPlaceholder: 'Enter API key for AI editing...',
+    openaiKeySet: 'Key set - AI editing enabled',
+    noOpenaiKey: 'No key - AI features disabled',
   },
 
   // Transcript
@@ -173,6 +180,24 @@ export const en = {
     speaker: 'Speaker',
     importToStart: 'Import media to get started',
     selectAndTranscribe: 'Select media and transcribe',
+  },
+
+  // AI Edit
+  ai: {
+    title: 'AI Edit',
+    noKey: 'Add your OpenAI API key in Settings to enable AI editing.',
+    goToSettings: 'Go to Settings',
+    chatTab: 'Chat',
+    docTab: 'Document',
+    chatHint: 'Tell me how to edit your video.',
+    chatPlaceholder: 'Describe your edit...',
+    docHint: 'Paste your requirements document describing how the final video should be structured.',
+    docPlaceholder: 'Paste requirements document here...\n\nExample:\n- Start with the pricing discussion (5:30)\n- Then show the demo (12:00-18:00)\n- Skip the Q&A section\n- Add a title card "Q3 Review" at the beginning',
+    analyze: 'Analyze & Generate Edits',
+    thinking: 'Thinking...',
+    example1: '"Remove all the ums and pauses"',
+    example2: '"Make the intro 15 seconds"',
+    example3: '"Add a title card saying Q3 Review"',
   },
 
   // Auth
@@ -363,6 +388,16 @@ export const en = {
 
     // Update log (most recent first)
     updateEntries: [
+      {
+        date: '2026-03-11 (v5)',
+        items: [
+          'AI Edit panel: natural language editing commands via OpenAI (Chat mode).',
+          'Document mode: paste a requirements doc to auto-generate timeline edits.',
+          'Operations preview with Apply/Dismiss — all AI edits are a single undo step (Cmd+Z).',
+          'AI Edit button in toolbar with Sparkles icon.',
+          'OpenAI API key management in Settings panel.',
+        ],
+      },
       {
         date: '2026-03-11 (v4)',
         items: [

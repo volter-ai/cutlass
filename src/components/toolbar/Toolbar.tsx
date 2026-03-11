@@ -14,6 +14,7 @@ import {
   Magnet,
   HelpCircle,
   FolderOpen,
+  Sparkles,
 } from 'lucide-react';
 import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { formatTimecode } from '../../utils/time';
@@ -41,6 +42,8 @@ export function Toolbar() {
     settings,
     currentProjectName,
     projectSaved,
+    leftPanelTab,
+    setLeftPanelTab,
   } = useTimelineStore();
 
   const storeApi = useTimelineStoreApi();
@@ -167,6 +170,20 @@ export function Toolbar() {
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* AI Edit */}
+      <button
+        onClick={() => setLeftPanelTab(leftPanelTab === 'ai' ? 'media' : 'ai')}
+        className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold transition-colors hover:opacity-90"
+        style={{
+          background: leftPanelTab === 'ai' ? 'var(--accent)' : 'transparent',
+          color: leftPanelTab === 'ai' ? 'white' : 'var(--text-secondary)',
+          border: leftPanelTab === 'ai' ? 'none' : '1px solid var(--border)',
+        }}
+      >
+        <Sparkles size={12} />
+        {t.toolbar.aiEdit ?? 'AI Edit'}
+      </button>
 
       {/* Export */}
       <button

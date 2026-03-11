@@ -3,6 +3,7 @@ import { Toolbar } from './components/toolbar/Toolbar';
 import { MediaBin } from './components/media-bin/MediaBin';
 import { TranscriptPanel } from './components/transcript/TranscriptPanel';
 import { SettingsPanel } from './components/settings/SettingsPanel';
+import { AIEditPanel } from './components/ai/AIEditPanel';
 import { Viewer } from './components/viewer/Viewer';
 import { Timeline } from './components/timeline/Timeline';
 import { ExportDialog } from './components/export/ExportDialog';
@@ -17,7 +18,7 @@ import { getMediaFile } from './services/mediaStorage';
 import { createMediaFile } from './utils/media';
 import { useLanguage } from './context/LanguageProvider';
 
-const TABS = ['media', 'transcript', 'settings'] as const;
+const TABS = ['media', 'transcript', 'ai', 'settings'] as const;
 
 export default function App() {
   useKeyboardShortcuts();
@@ -62,6 +63,7 @@ export default function App() {
   const tabLabels: Record<(typeof TABS)[number], string> = {
     media: t.tabs.media,
     transcript: t.tabs.transcript,
+    ai: t.tabs.ai ?? 'AI',
     settings: t.tabs.settings,
   };
 
@@ -159,6 +161,7 @@ export default function App() {
           <div className="flex-1 min-h-0">
             {leftPanelTab === 'media' && <MediaBin />}
             {leftPanelTab === 'transcript' && <TranscriptPanel />}
+            {leftPanelTab === 'ai' && <AIEditPanel />}
             {leftPanelTab === 'settings' && <SettingsPanel />}
           </div>
         </div>

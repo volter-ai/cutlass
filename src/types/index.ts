@@ -124,6 +124,7 @@ export interface ProjectSettings {
   frameRate: number;
   captionStyle: CaptionStyle;
   deepgramApiKey: string;
+  openaiApiKey: string;
 }
 
 export const ASPECT_RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {

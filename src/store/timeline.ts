@@ -39,6 +39,9 @@ const DEFAULT_SETTINGS: ProjectSettings = {
   deepgramApiKey: typeof localStorage !== 'undefined'
     ? localStorage.getItem('cutlass-deepgram-key') ?? ''
     : '',
+  openaiApiKey: typeof localStorage !== 'undefined'
+    ? localStorage.getItem('cutlass-openai-key') ?? ''
+    : '',
 };
 
 export interface TimelineState {
@@ -72,7 +75,7 @@ export interface TimelineState {
   exportProgress: number;
 
   // UI
-  leftPanelTab: 'media' | 'transcript' | 'settings';
+  leftPanelTab: 'media' | 'transcript' | 'ai' | 'settings';
   showExportDialog: boolean;
   showHelpOverlay: boolean;
   showProjectsModal: boolean;
@@ -145,6 +148,7 @@ export interface TimelineState {
   // Actions - Settings
   setAspectRatio: (ratio: AspectRatio) => void;
   setDeepgramApiKey: (key: string) => void;
+  setOpenaiApiKey: (key: string) => void;
   setCaptionStyle: (style: Partial<CaptionStyle>) => void;
   setSettings: (settings: Partial<ProjectSettings>) => void;
 
@@ -154,7 +158,7 @@ export interface TimelineState {
   setShowExportDialog: (show: boolean) => void;
 
   // Actions - UI
-  setLeftPanelTab: (tab: 'media' | 'transcript' | 'settings') => void;
+  setLeftPanelTab: (tab: 'media' | 'transcript' | 'ai' | 'settings') => void;
   setShowHelpOverlay: (show: boolean) => void;
   setShowProjectsModal: (show: boolean) => void;
 
@@ -839,6 +843,14 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             state.settings.deepgramApiKey = key;
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem('cutlass-deepgram-key', key);
+            }
+          }),
+
+        setOpenaiApiKey: (key) =>
+          set((state) => {
+            state.settings.openaiApiKey = key;
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('cutlass-openai-key', key);
             }
           }),
 

@@ -20,12 +20,14 @@ export const es: Translations = {
     zoomOut: 'Alejar',
     help: 'Ayuda (?)',
     projects: 'Proyectos (Cmd+O)',
+    aiEdit: 'IA Editar',
   },
 
   // App tabs
   tabs: {
     media: 'medios',
     transcript: 'transcripci\u00f3n',
+    ai: 'IA',
     settings: 'ajustes',
   },
 
@@ -154,6 +156,11 @@ export const es: Translations = {
     bgColor: 'Fondo',
     textAlign: 'Alineación',
     textOutline: 'Contorno',
+    // OpenAI
+    openaiKey: 'Clave API de OpenAI',
+    openaiKeyPlaceholder: 'Ingresa la clave API para edici\u00f3n con IA...',
+    openaiKeySet: 'Clave configurada - edici\u00f3n con IA habilitada',
+    noOpenaiKey: 'Sin clave - funciones de IA deshabilitadas',
   },
 
   // Transcript
@@ -175,6 +182,24 @@ export const es: Translations = {
     speaker: 'Hablante',
     importToStart: 'Importa medios para comenzar',
     selectAndTranscribe: 'Selecciona un medio y transcr\u00edbelo',
+  },
+
+  // AI Edit
+  ai: {
+    title: 'IA Editar',
+    noKey: 'A\u00f1ade tu clave API de OpenAI en Ajustes para habilitar la edici\u00f3n con IA.',
+    goToSettings: 'Ir a Ajustes',
+    chatTab: 'Chat',
+    docTab: 'Documento',
+    chatHint: 'Dime c\u00f3mo editar tu video.',
+    chatPlaceholder: 'Describe tu edici\u00f3n...',
+    docHint: 'Pega tu documento de requisitos describiendo c\u00f3mo debe estructurarse el video final.',
+    docPlaceholder: 'Pega el documento de requisitos aqu\u00ed...\n\nEjemplo:\n- Empezar con la discusi\u00f3n de precios (5:30)\n- Luego mostrar la demo (12:00-18:00)\n- Saltar la secci\u00f3n de preguntas\n- A\u00f1adir un t\u00edtulo "Revisi\u00f3n Q3" al inicio',
+    analyze: 'Analizar y generar ediciones',
+    thinking: 'Pensando...',
+    example1: '"Eliminar todos los ums y pausas"',
+    example2: '"Hacer la intro de 15 segundos"',
+    example3: '"A\u00f1adir un t\u00edtulo que diga Revisi\u00f3n Q3"',
   },
 
   // Auth
@@ -365,6 +390,16 @@ export const es: Translations = {
 
     // Update log (most recent first)
     updateEntries: [
+      {
+        date: '2026-03-11 (v5)',
+        items: [
+          'Panel de edici\u00f3n con IA: comandos de edici\u00f3n en lenguaje natural v\u00eda OpenAI (modo Chat).',
+          'Modo documento: pega un documento de requisitos para generar ediciones autom\u00e1ticamente.',
+          'Vista previa de operaciones con Aplicar/Descartar \u2014 todas las ediciones de IA se deshacen en un solo paso (Cmd+Z).',
+          'Bot\u00f3n de edici\u00f3n IA en la barra de herramientas con \u00edcono de destellos.',
+          'Gesti\u00f3n de clave API de OpenAI en el panel de Ajustes.',
+        ],
+      },
       {
         date: '2026-03-11 (v4)',
         items: [
