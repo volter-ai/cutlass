@@ -1,10 +1,27 @@
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useMemo } from 'react';
 import { Link, AlertTriangle } from 'lucide-react';
 import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
 import { ClipContextMenu } from './ClipContextMenu';
 import { createMediaFile } from '../../utils/media';
 import type { TimelineClip as TClip } from '../../types';
+
+/** Stable waveform bars — heights are generated once per clip ID */
+function WaveformBars({ clipId }: { clipId: string }) {
+  const bars = useMemo(
+    () => Array.from({ length: 50 }, (_, i) => ({ i, h: Math.random() * 16 + 2 })),
+    [clipId], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  return (
+    <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
+      <svg viewBox="0 0 100 20" className="w-full h-3/4" preserveAspectRatio="none">
+        {bars.map(({ i, h }) => (
+          <rect key={i} x={i * 2} y={10 - h / 2} width={1.5} height={h} fill="white" />
+        ))}
+      </svg>
+    </div>
+  );
+}
 
 interface Props {
   clip: TClip;
@@ -343,23 +360,7 @@ export function TimelineClipComponent({ clip }: Props) {
 
         {/* Audio waveform placeholder */}
         {!isVideo && width > 30 && (
-          <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
-            <svg viewBox="0 0 100 20" className="w-full h-3/4" preserveAspectRatio="none">
-              {Array.from({ length: 50 }).map((_, i) => {
-                const h = Math.random() * 16 + 2;
-                return (
-                  <rect
-                    key={i}
-                    x={i * 2}
-                    y={10 - h / 2}
-                    width={1.5}
-                    height={h}
-                    fill="white"
-                  />
-                );
-              })}
-            </svg>
-          </div>
+          <WaveformBars clipId={clip.id} />
         )}
       </div>
 

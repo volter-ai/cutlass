@@ -2,7 +2,7 @@ import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { Maximize2 } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
-import type { TimelineClip, AnimationPreset } from '../../types';
+import type { AnimationPreset } from '../../types';
 
 /** Compute CSS transform + opacity for a clip animation at a given progress (0-1 through clip) */
 function getAnimationStyle(
@@ -80,21 +80,19 @@ export function Viewer() {
   const { t } = useLanguage();
 
   // Find the active video clip at the current playhead position
-  const videoTracks = tracks.filter((t) => t.type === 'video');
-  const activeClip = videoTracks.reduce<TimelineClip | null>(
-    (found, track) => {
-      if (found) return found;
-      return (
-        Object.values(clips).find(
-          (c) =>
-            c.trackId === track.id &&
-            playheadPosition >= c.startTime &&
-            playheadPosition < c.startTime + c.duration,
-        ) ?? null
-      );
-    },
-    null,
-  );
+  const activeClip = useMemo(() => {
+    const videoTrackIds = new Set(
+      tracks.filter((t) => t.type === 'video').map((t) => t.id),
+    );
+    return (
+      Object.values(clips).find(
+        (c) =>
+          videoTrackIds.has(c.trackId) &&
+          playheadPosition >= c.startTime &&
+          playheadPosition < c.startTime + c.duration,
+      ) ?? null
+    );
+  }, [tracks, clips, playheadPosition]);
 
   const activeMedia = activeClip ? mediaFiles[activeClip.mediaFileId] : null;
 

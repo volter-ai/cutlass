@@ -62,6 +62,7 @@ export default function App() {
       currentProjectName: saved.projectName || 'Untitled Project',
       projectSaved: true,
     });
+    storeApi.getState().recalculateDuration();
 
     // Try to recover media from IndexedDB
     const mediaNameMap = deserialized.mediaNameMap;
