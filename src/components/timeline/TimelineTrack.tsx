@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import { Volume2, VolumeX, Lock, Unlock, Eye, EyeOff, Type } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
@@ -20,6 +20,9 @@ export function TimelineTrack({ track }: Props) {
     useTimelineStore();
   const { t } = useLanguage();
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [pendingOverlay, setPendingOverlay] = useState<{ startTime: number; x: number } | null>(null);
+  const [pendingText, setPendingText] = useState('');
+  const pendingInputRef = useRef<HTMLInputElement>(null);
 
   const trackClips = Object.values(clips)
     .filter((c) => c.trackId === track.id)
@@ -65,25 +68,32 @@ export function TimelineTrack({ track }: Props) {
     e.dataTransfer.dropEffect = 'copy';
   }, []);
 
+  const commitPendingOverlay = useCallback(() => {
+    if (!pendingOverlay) return;
+    if (pendingText.trim()) {
+      addTextOverlay(track.id, pendingOverlay.startTime, pendingText.trim());
+    }
+    setPendingOverlay(null);
+    setPendingText('');
+  }, [pendingOverlay, pendingText, addTextOverlay, track.id]);
+
   const handleTrackClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.target !== e.currentTarget) return;
 
       if (isText && (activeTool === 'text' || e.detail === 2)) {
-        // Double-click or text tool: add text overlay
+        // Double-click or text tool: show inline input at click position
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const startTime = Math.max(0, x / zoom);
-        const text = prompt(t.clip.enterText);
-        if (text) {
-          addTextOverlay(track.id, startTime, text);
-        }
+        setPendingOverlay({ startTime, x });
+        setPendingText('');
         return;
       }
 
       clearSelection();
     },
-    [clearSelection, isText, activeTool, zoom, track.id, addTextOverlay],
+    [clearSelection, isText, activeTool, zoom],
   );
 
   const MuteIcon = isVideo
@@ -172,6 +182,34 @@ export function TimelineTrack({ track }: Props) {
         {trackTextOverlays.map((overlay) => (
           <TextOverlayClip key={overlay.id} overlay={overlay} />
         ))}
+
+        {/* Inline text input for new overlay (replaces browser prompt) */}
+        {pendingOverlay && (
+          <input
+            ref={pendingInputRef}
+            autoFocus
+            value={pendingText}
+            onChange={(e) => setPendingText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commitPendingOverlay(); }
+              if (e.key === 'Escape') { setPendingOverlay(null); setPendingText(''); }
+              e.stopPropagation(); // prevent timeline shortcuts from firing
+            }}
+            onBlur={commitPendingOverlay}
+            placeholder={t.clip.enterText}
+            className="absolute z-50 text-xs px-2 py-1 rounded"
+            style={{
+              left: pendingOverlay.x,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--accent)',
+              color: 'var(--text-primary)',
+              outline: 'none',
+              width: 160,
+            }}
+          />
+        )}
 
         {/* Track locked overlay */}
         {track.locked && (

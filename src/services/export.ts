@@ -193,33 +193,38 @@ export async function exportTimeline(
         filterParts.push(`[${animLabel}]fade=t=in:st=0:d=${fadeInDur},fade=t=out:st=${dur - fadeOutDur}:d=${fadeOutDur}[${animOut}]`);
         animLabel = animOut;
       }
-      // zoom-in, zoom-out, ken-burns: complex zoompan filters omitted for export performance
-      // These are rendered via CSS in the preview viewer
+      // zoom-in, zoom-out, ken-burns use CSS transforms in the Viewer preview;
+      // exporting them would require zoompan filters which are complex to implement
+    }
+
+    // Apply transitionIn / transitionOut fade filters before overlaying
+    let clipLabel = animLabel;
+
+    if (clip.transitionIn) {
+      const tr = clip.transitionIn;
+      if (tr.type === 'cross-dissolve' || tr.type === 'fade-from-black') {
+        const tiLabel = `${animLabel}ti`;
+        filterParts.push(`[${clipLabel}]fade=t=in:st=0:d=${tr.duration}[${tiLabel}]`);
+        clipLabel = tiLabel;
+      }
+    }
+
+    if (clip.transitionOut) {
+      const tr = clip.transitionOut;
+      if (tr.type === 'cross-dissolve' || tr.type === 'fade-to-black') {
+        const toLabel = `${animLabel}to`;
+        const fadeStart = Math.max(0, clip.duration - tr.duration);
+        filterParts.push(`[${clipLabel}]fade=t=out:st=${fadeStart}:d=${tr.duration}[${toLabel}]`);
+        clipLabel = toLabel;
+      }
     }
 
     // Overlay with enable timing
     const outLabel = `ov${i}`;
     const enableExpr = `between(t,${clip.startTime},${clip.startTime + clip.duration})`;
+    const overlayFilter = `overlay=0:0:enable='${enableExpr}'`;
 
-    // Apply transitions
-    let overlayFilter = `overlay=0:0:enable='${enableExpr}'`;
-    if (clip.transitionIn) {
-      const fadeIn = clip.transitionIn;
-      if (fadeIn.type === 'cross-dissolve' || fadeIn.type === 'fade-from-black') {
-        filterParts.push(
-          `[${animLabel}]fade=t=in:st=0:d=${fadeIn.duration}[${animLabel}f]`,
-        );
-        filterParts.push(
-          `${overlayLabel}[${animLabel}f]${overlayFilter}[${outLabel}]`,
-        );
-        overlayLabel = `[${outLabel}]`;
-        return;
-      }
-    }
-
-    filterParts.push(
-      `${overlayLabel}[${animLabel}]${overlayFilter}[${outLabel}]`,
-    );
+    filterParts.push(`${overlayLabel}[${clipLabel}]${overlayFilter}[${outLabel}]`);
     overlayLabel = `[${outLabel}]`;
   });
 
