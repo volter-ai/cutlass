@@ -127,7 +127,7 @@ export function useAudioPlayback() {
           audioElement.currentTime = mediaTime;
         }
         if (audioElement.paused) {
-          audioElement.play().catch(() => {});
+          audioElement.play().catch((err) => console.warn('Audio play failed:', err));
         }
       } else {
         audioElement.pause();

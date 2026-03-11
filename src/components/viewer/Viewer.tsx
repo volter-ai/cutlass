@@ -171,7 +171,7 @@ export function Viewer() {
         video.currentTime = mediaTime;
       }
       if (video.paused) {
-        video.play().catch(() => {});
+        video.play().catch((err) => console.warn('Video play failed:', err));
       }
     }
   }, [playheadPosition, isPlaying, activeClip, activeMedia]);

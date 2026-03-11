@@ -18,7 +18,8 @@ export function usePlayback() {
     lastFrameRef.current = performance.now();
 
     function tick(now: number) {
-      const delta = (now - lastFrameRef.current) / 1000;
+      // Clamp delta to prevent huge playhead jumps after tab switch
+      const delta = Math.min((now - lastFrameRef.current) / 1000, 0.1);
       lastFrameRef.current = now;
 
       const state = storeApi.getState();

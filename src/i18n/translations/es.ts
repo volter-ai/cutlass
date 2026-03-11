@@ -366,6 +366,15 @@ export const es: Translations = {
     // Update log (most recent first)
     updateEntries: [
       {
+        date: '2026-03-11 (v4)',
+        items: [
+          'Corregida eliminación con ondulación de múltiples clips que corrompía posiciones (ahora elimina de derecha a izquierda).',
+          'Delta de reproducción limitado para evitar salto del cabezal al cambiar de pestaña del navegador.',
+          'Función auxiliar compartida para dividir en el cabezal (C y Cmd+K usan la misma lógica).',
+          'Errores de reproducción de video/audio ahora se registran en la consola para depuración.',
+        ],
+      },
+      {
         date: '2026-03-11 (v3)',
         items: [
           'La tecla C ahora corta todos los clips en la posición del cabezal de reproducción.',

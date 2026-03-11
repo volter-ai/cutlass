@@ -2,6 +2,16 @@ import { useEffect } from 'react';
 import { useTimelineStoreApi } from '../store/timeline';
 import { saveProject, autoSaveLocal } from '../services/projects';
 
+/** Split all clips at the current playhead position */
+function splitAllAtPlayhead(store: ReturnType<ReturnType<typeof useTimelineStoreApi>['getState']>) {
+  const playhead = store.playheadPosition;
+  Object.values(store.clips).forEach((clip) => {
+    if (playhead > clip.startTime && playhead < clip.startTime + clip.duration) {
+      store.splitClipAtPlayhead(clip.id);
+    }
+  });
+}
+
 export function useKeyboardShortcuts() {
   const storeApi = useTimelineStoreApi();
 
@@ -30,16 +40,7 @@ export function useKeyboardShortcuts() {
         case 'k':
           if (isMeta) {
             e.preventDefault();
-            // Split all clips at playhead
-            const playhead = store.playheadPosition;
-            Object.values(store.clips).forEach((clip) => {
-              if (
-                playhead > clip.startTime &&
-                playhead < clip.startTime + clip.duration
-              ) {
-                store.splitClipAtPlayhead(clip.id);
-              }
-            });
+            splitAllAtPlayhead(store);
           }
           break;
 
@@ -48,7 +49,10 @@ export function useKeyboardShortcuts() {
           if (store.selectedClipIds.length > 0) {
             e.preventDefault();
             if (e.shiftKey) {
-              store.selectedClipIds.forEach((id) => store.rippleDelete(id));
+              // Sort by startTime descending so ripple shifts don't corrupt later positions
+              [...store.selectedClipIds]
+                .sort((a, b) => (store.clips[b]?.startTime ?? 0) - (store.clips[a]?.startTime ?? 0))
+                .forEach((id) => store.rippleDelete(id));
             } else {
               store.selectedClipIds.forEach((id) => store.removeClip(id));
             }
@@ -78,16 +82,7 @@ export function useKeyboardShortcuts() {
         case 'c':
           if (!isMeta) {
             e.preventDefault();
-            // Cut all clips at playhead
-            const playhead = store.playheadPosition;
-            Object.values(store.clips).forEach((clip) => {
-              if (
-                playhead > clip.startTime &&
-                playhead < clip.startTime + clip.duration
-              ) {
-                store.splitClipAtPlayhead(clip.id);
-              }
-            });
+            splitAllAtPlayhead(store);
           }
           break;
 

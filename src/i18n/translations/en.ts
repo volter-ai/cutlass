@@ -364,6 +364,15 @@ export const en = {
     // Update log (most recent first)
     updateEntries: [
       {
+        date: '2026-03-11 (v4)',
+        items: [
+          'Fixed multi-clip ripple delete corrupting timeline positions (now deletes right-to-left).',
+          'Playback delta clamped to prevent playhead jump after browser tab switch.',
+          'Extracted shared split-at-playhead helper (C key and Cmd+K use same logic).',
+          'Video/audio playback errors now logged to console for debugging.',
+        ],
+      },
+      {
         date: '2026-03-11 (v3)',
         items: [
           'C key now cuts all clips at the playhead position (instant cut).',
