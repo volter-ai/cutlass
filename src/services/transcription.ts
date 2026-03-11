@@ -8,18 +8,29 @@ const FILLER_WORDS = new Set([
 ]);
 
 /**
- * Transcribe media using either:
- * 1. Deepgram API (if VITE_DEEPGRAM_API_KEY is set)
- * 2. Demo mode (generates realistic mock transcript)
+ * Transcribe media using:
+ * 1. Deepgram (if deepgramApiKey set) — best quality, speaker diarization
+ * 2. OpenAI Whisper (if openaiApiKey set) — good quality, word timestamps
+ * 3. Demo mode (fallback)
  */
-export async function transcribeMedia(media: MediaFile, apiKey?: string): Promise<Transcript> {
-  // Check for API key: explicit param > env var > localStorage
-  const key = apiKey
+export async function transcribeMedia(
+  media: MediaFile,
+  deepgramApiKey?: string,
+  openaiApiKey?: string,
+): Promise<Transcript> {
+  const dgKey = deepgramApiKey
     || import.meta.env.VITE_DEEPGRAM_API_KEY
     || (typeof localStorage !== 'undefined' ? localStorage.getItem('cutlass-deepgram-key') : null);
 
-  if (key) {
-    return transcribeWithDeepgram(media, key);
+  if (dgKey) {
+    return transcribeWithDeepgram(media, dgKey);
+  }
+
+  const oaiKey = openaiApiKey
+    || (typeof localStorage !== 'undefined' ? localStorage.getItem('cutlass-openai-key') : null);
+
+  if (oaiKey) {
+    return transcribeWithOpenAI(media, oaiKey);
   }
 
   // Demo mode: generate a mock transcript
@@ -106,6 +117,87 @@ function parseDeepgramResponse(mediaFileId: string, data: DeepgramResponse): Tra
         });
         currentSegment = [];
       }
+    }
+  }
+
+  return { mediaFileId, segments, scenes: [] };
+}
+
+async function transcribeWithOpenAI(media: MediaFile, apiKey: string): Promise<Transcript> {
+  const formData = new FormData();
+  formData.append('file', media.file);
+  formData.append('model', 'whisper-1');
+  formData.append('response_format', 'verbose_json');
+  formData.append('timestamp_granularities[]', 'word');
+
+  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenAI Whisper API error: ${response.status}`);
+  }
+
+  const data: WhisperResponse = await response.json();
+  return parseWhisperResponse(media.id, data);
+}
+
+function parseWhisperResponse(mediaFileId: string, data: WhisperResponse): Transcript {
+  const segments: TranscriptSegment[] = [];
+  const allWords = data.words ?? [];
+
+  if (allWords.length === 0) {
+    // No word timestamps — fall back to one segment per Whisper segment
+    for (const seg of data.segments ?? []) {
+      const words = seg.text.trim().split(/\s+/).filter(Boolean);
+      const duration = seg.end - seg.start;
+      const perWord = words.length > 0 ? duration / words.length : duration;
+      const segWords: TranscriptWord[] = words.map((w, i) => ({
+        word: w,
+        start: seg.start + i * perWord,
+        end: seg.start + (i + 1) * perWord,
+        confidence: 1,
+        isFiller: isFillerWord(w),
+        isRemoved: false,
+      }));
+      if (segWords.length > 0) {
+        segments.push({ id: uuid(), words: segWords, start: seg.start, end: seg.end });
+      }
+    }
+    return { mediaFileId, segments, scenes: [] };
+  }
+
+  // Group word-level timings into segments by sentence-ending punctuation or pause
+  let currentSegment: TranscriptWord[] = [];
+  let segStart = 0;
+
+  for (let i = 0; i < allWords.length; i++) {
+    const w = allWords[i];
+    if (currentSegment.length === 0) segStart = w.start;
+
+    currentSegment.push({
+      word: w.word,
+      start: w.start,
+      end: w.end,
+      confidence: 1,
+      isFiller: isFillerWord(w.word),
+      isRemoved: false,
+    });
+
+    const nextWord = allWords[i + 1];
+    const isPunctEnd = /[.!?]$/.test(w.word);
+    const hasGap = nextWord && nextWord.start - w.end > 0.5;
+
+    if (isPunctEnd || hasGap || i === allWords.length - 1) {
+      segments.push({
+        id: uuid(),
+        words: currentSegment,
+        start: segStart,
+        end: w.end,
+      });
+      currentSegment = [];
     }
   }
 
@@ -216,4 +308,11 @@ interface DeepgramWord {
   end: number;
   confidence: number;
   speaker?: number;
+}
+
+// OpenAI Whisper API types
+interface WhisperResponse {
+  text: string;
+  words?: Array<{ word: string; start: number; end: number }>;
+  segments?: Array<{ id: number; start: number; end: number; text: string }>;
 }

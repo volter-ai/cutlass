@@ -43,7 +43,11 @@ export function TranscriptPanel() {
       try {
         const media = mediaFiles[mediaFileId];
         if (!media) return;
-        const transcript = await transcribeMedia(media, settings.deepgramApiKey || undefined);
+        const transcript = await transcribeMedia(
+          media,
+          settings.deepgramApiKey || undefined,
+          settings.openaiApiKey || undefined,
+        );
         setTranscript(mediaFileId, transcript);
         setActiveTranscriptMediaId(mediaFileId);
       } catch (err) {
@@ -150,6 +154,16 @@ export function TranscriptPanel() {
                   </>
                 )}
               </button>
+              {!settings.deepgramApiKey && !settings.openaiApiKey && (
+                <p className="mt-1 text-xs px-1" style={{ color: 'var(--filler-highlight)' }}>
+                  No API key — will generate a demo placeholder. Add a Deepgram or OpenAI key in Settings for real transcription.
+                </p>
+              )}
+              {!settings.deepgramApiKey && !!settings.openaiApiKey && (
+                <p className="mt-1 text-xs px-1" style={{ color: 'var(--text-secondary)' }}>
+                  Using OpenAI Whisper. Add a Deepgram key in Settings for speaker diarization.
+                </p>
+              )}
               {transcriptionError && (
                 <p className="mt-1 text-xs px-1" style={{ color: '#ef4444' }}>
                   {transcriptionError}
@@ -214,6 +228,14 @@ export function TranscriptPanel() {
             <MessageSquarePlus size={11} />
             {t.transcript.addCaptionsToTimeline ?? 'Add Captions'}
           </button>
+        </div>
+      )}
+
+      {/* Demo mode banner */}
+      {activeTranscript && !settings.deepgramApiKey && !settings.openaiApiKey && (
+        <div className="px-3 py-1.5 border-b text-xs flex items-center gap-1.5" style={{ borderColor: 'var(--border)', background: 'rgba(245,158,11,0.1)', color: 'var(--filler-highlight)' }}>
+          <span className="font-bold">DEMO</span>
+          <span>— placeholder text, not from your video. Add a Deepgram or OpenAI key in Settings.</span>
         </div>
       )}
 

@@ -136,6 +136,7 @@ export function TextOverlayClip({ overlay }: Props) {
       onMouseDown={(e) => handleMouseDown(e, 'move')}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
+      title="Double-click to edit text • Click to style in Settings"
     >
       {/* Text content or inline edit */}
       <div className="flex-1 h-full flex items-center px-2 overflow-hidden">
@@ -156,6 +157,12 @@ export function TextOverlayClip({ overlay }: Props) {
         ) : (
           <span className="text-xs text-black truncate font-semibold">
             {overlay.text}
+            <span
+              className="ml-1 opacity-0 group-hover:opacity-60 transition-opacity text-xs font-normal"
+              style={{ fontSize: '0.6rem' }}
+            >
+              ✎
+            </span>
           </span>
         )}
       </div>

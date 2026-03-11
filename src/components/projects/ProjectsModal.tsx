@@ -14,6 +14,7 @@ import {
 } from '../../services/projects';
 import { getMediaFile } from '../../services/mediaStorage';
 import { createMediaFile } from '../../utils/media';
+import { DEFAULT_TRACKS } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
 import type { Project } from '../../types';
 
@@ -79,7 +80,21 @@ export function ProjectsModal() {
     }
     try {
       const project = await createProject('Untitled Project');
-      setCurrentProject(project.id, project.name);
+      storeApi.setState({
+        tracks: DEFAULT_TRACKS,
+        clips: {},
+        textOverlays: {},
+        transcripts: {},
+        currentProjectId: project.id,
+        currentProjectName: project.name,
+        projectSaved: true,
+        playheadPosition: 0,
+        isPlaying: false,
+        selectedClipIds: [],
+        selectedTextOverlayId: null,
+        activeTranscriptMediaId: null,
+      });
+      storeApi.getState().recalculateDuration();
       setShow(false);
     } catch {
       // Error creating project

@@ -179,7 +179,7 @@ export interface TimelineState {
 
 export type TimelineStore = ReturnType<typeof createTimelineStore>;
 
-const DEFAULT_TRACKS: Track[] = [
+export const DEFAULT_TRACKS: Track[] = [
   { id: 'v2', type: 'video', name: 'V2', muted: false, locked: false, height: 60, volume: 1 },
   { id: 'v1', type: 'video', name: 'V1', muted: false, locked: false, height: 60, volume: 1 },
   { id: 'a1', type: 'audio', name: 'A1', muted: false, locked: false, height: 50, volume: 1 },
@@ -927,6 +927,17 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         setCaptionStyle: (style) =>
           set((state) => {
             Object.assign(state.settings.captionStyle, style);
+            // Apply style changes to all existing text overlays
+            const yPos = state.settings.captionStyle.position === 'bottom' ? 88
+              : state.settings.captionStyle.position === 'top' ? 10
+              : 50;
+            Object.values(state.textOverlays).forEach((overlay) => {
+              if (style.fontSize !== undefined) overlay.style.fontSize = style.fontSize;
+              if (style.color !== undefined) overlay.style.color = style.color;
+              if (style.backgroundColor !== undefined) overlay.style.backgroundColor = style.backgroundColor;
+              if (style.fontFamily !== undefined) overlay.style.fontFamily = style.fontFamily;
+              if (style.position !== undefined) overlay.style.y = yPos;
+            });
           }),
 
         setBackgroundColor: (color) =>

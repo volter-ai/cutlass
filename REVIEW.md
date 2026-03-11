@@ -47,6 +47,19 @@ Open GitHub issues filed for remaining UX items: #8 (effect discoverability), #9
 
 ---
 
+## Bahar tester feedback — fixes (2026-03-11, round 2)
+
+| Issue | Fix |
+|-------|-----|
+| Demo transcript looks like a real transcript | `TranscriptPanel.tsx`: warning shown before Transcribe button when no API key; amber DEMO banner shown above transcript content when key is absent |
+| New project keeps previous timeline content | `ProjectsModal.tsx`: `handleNew` now calls `storeApi.setState` with `DEFAULT_TRACKS`/empty clips/overlays/transcripts to reset the canvas; `DEFAULT_TRACKS` exported from `store/timeline.ts` |
+| Caption style presets don't apply to existing overlays | `store/timeline.ts`: `setCaptionStyle` now iterates all `textOverlays` and syncs fontSize, color, backgroundColor, fontFamily, y-position whenever any of those fields are included in the style update |
+| Captions not editable / editing not discoverable | `TextOverlayClip.tsx`: native tooltip `title` now reads "Double-click to edit text • Click to style in Settings"; a small ✎ pencil hint appears on hover |
+
+GitHub issues: #10, #11, #12, #13
+
+---
+
 ## No open actionable issues
 
 After three review passes the following have all been addressed:
