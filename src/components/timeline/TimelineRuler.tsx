@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 import { useTimelineStore } from '../../store/timeline';
 import { formatTimecode } from '../../utils/time';
 
@@ -11,20 +11,22 @@ export function TimelineRuler() {
 
   const totalWidth = duration * zoom;
 
-  // Determine tick interval based on zoom
-  let majorInterval = 1; // seconds
-  if (zoom < 30) majorInterval = 10;
-  else if (zoom < 60) majorInterval = 5;
-  else if (zoom < 150) majorInterval = 1;
-  else majorInterval = 0.5;
+  const ticks = useMemo(() => {
+    let interval = 1; // seconds
+    if (zoom < 30) interval = 10;
+    else if (zoom < 60) interval = 5;
+    else if (zoom < 150) interval = 1;
+    else interval = 0.5;
 
-  const ticks: { time: number; major: boolean }[] = [];
-  for (let t = 0; t <= duration; t += majorInterval / 5) {
-    ticks.push({
-      time: t,
-      major: Math.abs(t % majorInterval) < 0.001 || Math.abs(t % majorInterval - majorInterval) < 0.001,
-    });
-  }
+    const t: { time: number; major: boolean }[] = [];
+    for (let s = 0; s <= duration; s += interval / 5) {
+      t.push({
+        time: s,
+        major: Math.abs(s % interval) < 0.001 || Math.abs(s % interval - interval) < 0.001,
+      });
+    }
+    return t;
+  }, [zoom, duration]);
 
   const handleRulerClick = useCallback(
     (e: React.MouseEvent) => {

@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
+import { ASPECT_RATIO_DIMENSIONS } from '../types';
 import type {
   MediaFile,
   TimelineClip,
@@ -18,15 +19,7 @@ import type {
   AspectRatio,
   ProjectSettings,
   CaptionStyle,
-  ASPECT_RATIO_DIMENSIONS,
 } from '../types';
-
-const ASPECT_DIMS: typeof ASPECT_RATIO_DIMENSIONS = {
-  '16:9': { width: 1920, height: 1080 },
-  '9:16': { width: 1080, height: 1920 },
-  '1:1': { width: 1080, height: 1080 },
-  '4:5': { width: 1080, height: 1350 },
-};
 
 const DEFAULT_CAPTION_STYLE: CaptionStyle = {
   preset: 'default',
@@ -289,11 +282,13 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           return clipId;
         },
 
-        removeClip: (clipId) =>
+        removeClip: (clipId) => {
           set((state) => {
             delete state.clips[clipId];
             state.selectedClipIds = state.selectedClipIds.filter((id) => id !== clipId);
-          }),
+          });
+          get().recalculateDuration();
+        },
 
         moveClip: (clipId, newStartTime, newTrackId) =>
           set((state) => {
@@ -386,7 +381,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             clip.fadeOut = 0;
           }),
 
-        rippleDelete: (clipId) =>
+        rippleDelete: (clipId) => {
           set((state) => {
             const clip = state.clips[clipId];
             if (!clip) return;
@@ -402,7 +397,9 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                 c.startTime -= gap;
               }
             });
-          }),
+          });
+          get().recalculateDuration();
+        },
 
         setClipVolume: (clipId, volume) =>
           set((state) => {
@@ -420,7 +417,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             }
           }),
 
-        setClipSpeed: (clipId, speed) =>
+        setClipSpeed: (clipId, speed) => {
           set((state) => {
             const clip = state.clips[clipId];
             if (!clip) return;
@@ -439,7 +436,9 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                 linked.speed = clampedSpeed;
               }
             }
-          }),
+          });
+          get().recalculateDuration();
+        },
 
         setClipFitMode: (clipId, fitMode) =>
           set((state) => {
@@ -613,7 +612,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           return trackId;
         },
 
-        removeTrack: (trackId) =>
+        removeTrack: (trackId) => {
           set((state) => {
             state.tracks = state.tracks.filter((t) => t.id !== trackId);
             Object.keys(state.clips).forEach((clipId) => {
@@ -626,7 +625,9 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                 delete state.textOverlays[id];
               }
             });
-          }),
+          });
+          get().recalculateDuration();
+        },
 
         toggleTrackMute: (trackId) =>
           set((state) => {
@@ -707,7 +708,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             state.activeTranscriptMediaId = id;
           }),
 
-        removeFillerWords: (mediaFileId, mode) =>
+        removeFillerWords: (mediaFileId, mode) => {
           set((state) => {
             const transcript = state.transcripts[mediaFileId];
             if (!transcript) return;
@@ -747,16 +748,16 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                   const clipEnd = clip.startTime + clip.duration;
                   const regionStartInClip = region.start - clip.mediaOffset + clip.startTime;
                   const regionEndInClip = region.end - clip.mediaOffset + clip.startTime;
+                  const fillerDuration = region.end - region.start;
 
                   if (regionStartInClip > clip.startTime && regionEndInClip < clipEnd) {
+                    // Interior: filler falls entirely within the clip — split and close gap
                     const newClipId = uuid();
-                    const fillerDuration = region.end - region.start;
-
                     state.clips[newClipId] = {
                       id: newClipId,
                       mediaFileId: clip.mediaFileId,
                       trackId: clip.trackId,
-                      startTime: regionStartInClip,
+                      startTime: regionStartInClip - fillerDuration,
                       duration: clipEnd - regionEndInClip,
                       mediaOffset: clip.mediaOffset + (regionEndInClip - clip.startTime),
                       name: clip.name,
@@ -766,14 +767,31 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                       fadeIn: 0,
                       fadeOut: clip.fadeOut,
                     };
-
                     clip.duration = regionStartInClip - clip.startTime;
-                    state.clips[newClipId].startTime -= fillerDuration;
+                  } else if (
+                    regionStartInClip <= clip.startTime &&
+                    regionEndInClip > clip.startTime &&
+                    regionEndInClip < clipEnd
+                  ) {
+                    // Leading edge: filler overlaps the clip's start — trim start and close gap
+                    const trimAmount = regionEndInClip - clip.startTime;
+                    clip.mediaOffset += trimAmount;
+                    clip.duration -= trimAmount;
+                    clip.startTime -= trimAmount;
+                  } else if (
+                    regionStartInClip > clip.startTime &&
+                    regionStartInClip < clipEnd &&
+                    regionEndInClip >= clipEnd
+                  ) {
+                    // Trailing edge: filler overlaps the clip's end — trim end
+                    clip.duration = regionStartInClip - clip.startTime;
                   }
                 });
               });
             }
-          }),
+          });
+          get().recalculateDuration();
+        },
 
         detectScenes: (mediaFileId) =>
           set((state) => {
@@ -809,7 +827,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         setAspectRatio: (ratio) =>
           set((state) => {
             state.settings.aspectRatio = ratio;
-            state.settings.resolution = ASPECT_DIMS[ratio];
+            state.settings.resolution = ASPECT_RATIO_DIMENSIONS[ratio];
           }),
 
         setDeepgramApiKey: (key) =>

@@ -2,8 +2,11 @@ const DB_NAME = 'cutlass-media';
 const DB_VERSION = 1;
 const STORE_NAME = 'files';
 
+let _db: Promise<IDBDatabase> | null = null;
+
 function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (_db) return _db;
+  _db = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -12,8 +15,12 @@ function openDB(): Promise<IDBDatabase> {
       }
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onerror = () => {
+      _db = null; // allow retry on failure
+      reject(request.error);
+    };
   });
+  return _db;
 }
 
 export async function storeMediaFile(id: string, file: File): Promise<void> {

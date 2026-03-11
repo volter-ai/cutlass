@@ -37,7 +37,6 @@ export function HelpOverlay() {
     fontSize: 12,
     fontWeight: activeTab === tab ? 700 : 500,
     color: activeTab === tab ? 'var(--accent)' : 'var(--text-secondary)',
-    borderBottom: activeTab === tab ? '2px solid var(--accent)' : '2px solid transparent',
     background: 'none',
     border: 'none',
     borderBottomWidth: 2,
