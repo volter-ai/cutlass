@@ -9,7 +9,7 @@ const FONT_FAMILIES = [
 ];
 
 export function SettingsPanel() {
-  const { settings, setAspectRatio, setDeepgramApiKey, setOpenaiApiKey, setCaptionStyle } = useTimelineStore();
+  const { settings, setAspectRatio, setDeepgramApiKey, setOpenaiApiKey, setCaptionStyle, setBackgroundColor } = useTimelineStore();
   const selectedTextOverlayId = useTimelineStore((s) => s.selectedTextOverlayId);
   const textOverlays = useTimelineStore((s) => s.textOverlays);
   const updateTextOverlay = useTimelineStore((s) => s.updateTextOverlay);
@@ -92,6 +92,23 @@ export function SettingsPanel() {
           </div>
           <div className="mt-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
             {settings.resolution.width} x {settings.resolution.height}
+          </div>
+
+          {/* Background Color */}
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              {t.settings.backgroundColor ?? 'Background'}
+            </span>
+            <input
+              type="color"
+              value={settings.backgroundColor ?? '#000000'}
+              onChange={(e) => setBackgroundColor(e.target.value)}
+              className="w-6 h-6 rounded cursor-pointer border-0"
+              title="Background color for letterbox / pillarbox areas"
+            />
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              {settings.backgroundColor ?? '#000000'}
+            </span>
           </div>
         </section>
 

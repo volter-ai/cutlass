@@ -42,6 +42,7 @@ const DEFAULT_SETTINGS: ProjectSettings = {
   openaiApiKey: typeof localStorage !== 'undefined'
     ? localStorage.getItem('cutlass-openai-key') ?? ''
     : '',
+  backgroundColor: '#000000',
 };
 
 export interface TimelineState {
@@ -144,12 +145,14 @@ export interface TimelineState {
   setActiveTranscriptMediaId: (id: string | null) => void;
   removeFillerWords: (mediaFileId: string, mode: FillerRemovalMode) => void;
   detectScenes: (mediaFileId: string) => void;
+  addTranscriptCaptionsToTimeline: (mediaFileId: string) => void;
 
   // Actions - Settings
   setAspectRatio: (ratio: AspectRatio) => void;
   setDeepgramApiKey: (key: string) => void;
   setOpenaiApiKey: (key: string) => void;
   setCaptionStyle: (style: Partial<CaptionStyle>) => void;
+  setBackgroundColor: (color: string) => void;
   setSettings: (settings: Partial<ProjectSettings>) => void;
 
   // Actions - Export
@@ -831,6 +834,73 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             transcript.scenes = scenes;
           }),
 
+        addTranscriptCaptionsToTimeline: (mediaFileId) => {
+          const state = get();
+          const transcript = state.transcripts[mediaFileId];
+          if (!transcript) return;
+
+          const captionStyle = state.settings.captionStyle;
+          const maxWords = captionStyle.maxWords ?? 8;
+
+          // Find or create a text track
+          let textTrackId = state.tracks.find((t) => t.type === 'text')?.id;
+          if (!textTrackId) {
+            textTrackId = uuid();
+            set((s) => {
+              s.tracks.push({
+                id: textTrackId!,
+                type: 'text',
+                name: 'T1',
+                muted: false,
+                locked: false,
+                height: 40,
+                volume: 1,
+              });
+            });
+          }
+
+          // Build caption text overlays grouped by maxWords
+          set((s) => {
+            // Y position based on captionStyle.position
+            const yPos = captionStyle.position === 'bottom' ? 88
+              : captionStyle.position === 'top' ? 10
+              : 50;
+
+            transcript.segments.forEach((segment) => {
+              const visibleWords = segment.words.filter((w) => !w.isRemoved);
+              for (let i = 0; i < visibleWords.length; i += maxWords) {
+                const chunk = visibleWords.slice(i, i + maxWords);
+                if (chunk.length === 0) continue;
+                const text = chunk.map((w) => w.word).join(' ');
+                const start = chunk[0].start;
+                const end = chunk[chunk.length - 1].end;
+                const id = uuid();
+                s.textOverlays[id] = {
+                  id,
+                  trackId: textTrackId!,
+                  startTime: start,
+                  duration: Math.max(0.1, end - start),
+                  text,
+                  style: {
+                    fontFamily: captionStyle.fontFamily ?? 'Arial',
+                    fontSize: captionStyle.fontSize ?? 24,
+                    fontWeight: 'bold',
+                    color: captionStyle.color ?? '#ffffff',
+                    backgroundColor: captionStyle.backgroundColor ?? 'rgba(0,0,0,0.7)',
+                    x: 50,
+                    y: yPos,
+                    textAlign: 'center',
+                    outline: false,
+                    outlineColor: '#000000',
+                  },
+                };
+              }
+            });
+          });
+
+          get().recalculateDuration();
+        },
+
         // Settings
         setAspectRatio: (ratio) =>
           set((state) => {
@@ -857,6 +927,11 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         setCaptionStyle: (style) =>
           set((state) => {
             Object.assign(state.settings.captionStyle, style);
+          }),
+
+        setBackgroundColor: (color) =>
+          set((state) => {
+            state.settings.backgroundColor = color;
           }),
 
         setSettings: (settings) =>

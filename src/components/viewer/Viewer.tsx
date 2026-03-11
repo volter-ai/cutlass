@@ -4,6 +4,20 @@ import { useTimelineStore } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
 import type { AnimationPreset } from '../../types';
 
+/** Compute fade volume multiplier (0–1) for a clip at the given playhead position */
+function computeVideoFadeMultiplier(clip: { startTime: number; duration: number; fadeIn: number; fadeOut: number }, playheadPosition: number): number {
+  const elapsed = playheadPosition - clip.startTime;
+  const remaining = clip.startTime + clip.duration - playheadPosition;
+  let multiplier = 1.0;
+  if (clip.fadeIn > 0 && elapsed < clip.fadeIn) {
+    multiplier = Math.max(0, elapsed / clip.fadeIn);
+  }
+  if (clip.fadeOut > 0 && remaining < clip.fadeOut) {
+    multiplier = Math.min(multiplier, Math.max(0, remaining / clip.fadeOut));
+  }
+  return multiplier;
+}
+
 /** Compute CSS transform + opacity for a clip animation at a given progress (0-1 through clip) */
 function getAnimationStyle(
   preset: AnimationPreset | undefined,
@@ -79,6 +93,7 @@ export function Viewer() {
   const mediaFiles = useTimelineStore((s) => s.mediaFiles);
   const textOverlays = useTimelineStore((s) => s.textOverlays);
   const resolution = useTimelineStore((s) => s.settings.resolution);
+  const backgroundColor = useTimelineStore((s) => s.settings.backgroundColor ?? '#000000');
   const { t } = useLanguage();
 
   // Track container width for scaling text overlays
@@ -115,6 +130,12 @@ export function Viewer() {
     if (!activeClip) return { transform: '', opacity: 1 };
     const progress = (playheadPosition - activeClip.startTime) / activeClip.duration;
     return getAnimationStyle(activeClip.animation?.preset, Math.max(0, Math.min(1, progress)));
+  }, [activeClip, playheadPosition]);
+
+  // Compute fade envelope opacity (fadeIn / fadeOut)
+  const fadeOpacity = useMemo(() => {
+    if (!activeClip) return 1;
+    return computeVideoFadeMultiplier(activeClip, playheadPosition);
   }, [activeClip, playheadPosition]);
 
   // Compute transition opacity (transitionIn / transitionOut)
@@ -222,7 +243,7 @@ export function Viewer() {
           className="relative max-w-full max-h-full overflow-hidden"
           style={{
             aspectRatio: `${resolution.width}/${resolution.height}`,
-            background: '#000',
+            background: backgroundColor,
           }}
         >
           {activeMedia ? (
@@ -234,7 +255,7 @@ export function Viewer() {
                   : activeClip?.fitMode === 'stretch' ? 'fill'
                   : 'contain',
                 transform: combinedTransform || undefined,
-                opacity: animStyle.opacity * transitionOpacity,
+                opacity: animStyle.opacity * transitionOpacity * fadeOpacity,
               }}
               muted
               playsInline

@@ -32,7 +32,7 @@ export async function exportTimeline(
   onProgress(5);
 
   const { clips, mediaFiles, tracks, textOverlays, transcripts } = state;
-  const { resolution, frameRate } = state.settings;
+  const { resolution, frameRate, backgroundColor } = state.settings;
 
   // Collect all media files used by clips
   const usedMediaIds = new Set<string>();
@@ -114,10 +114,11 @@ export async function exportTimeline(
     args.push('-i', filename);
   }
 
-  // Create a black background canvas
+  // Create background canvas with user-selected color
+  const bgColor = (backgroundColor ?? '#000000').replace('#', '0x');
   args.push(
     '-f', 'lavfi',
-    '-i', `color=c=black:s=${resolution.width}x${resolution.height}:r=${frameRate}:d=${timelineDuration}`,
+    '-i', `color=c=${bgColor}:s=${resolution.width}x${resolution.height}:r=${frameRate}:d=${timelineDuration}`,
   );
   const canvasIdx = inputFiles.length;
 
@@ -237,6 +238,19 @@ export async function exportTimeline(
         filterParts.push(`[${clipLabel}]fade=t=out:st=${fadeStart}:d=${tr.duration}[${toLabel}]`);
         clipLabel = toLabel;
       }
+    }
+
+    // Apply clip-level fadeIn / fadeOut (separate from animation presets and transitions)
+    if (clip.fadeIn > 0) {
+      const fiLabel = `${trimLabel}fi`;
+      filterParts.push(`[${clipLabel}]fade=t=in:st=0:d=${clip.fadeIn}[${fiLabel}]`);
+      clipLabel = fiLabel;
+    }
+    if (clip.fadeOut > 0) {
+      const foLabel = `${trimLabel}fo`;
+      const fadeStart = Math.max(0, clip.duration - clip.fadeOut);
+      filterParts.push(`[${clipLabel}]fade=t=out:st=${fadeStart}:d=${clip.fadeOut}[${foLabel}]`);
+      clipLabel = foLabel;
     }
 
     // Overlay with enable timing

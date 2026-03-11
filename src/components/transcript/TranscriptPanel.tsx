@@ -5,6 +5,7 @@ import {
   Sparkles,
   Wand2,
   Layers,
+  MessageSquarePlus,
 } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { transcribeMedia } from '../../services/transcription';
@@ -20,6 +21,7 @@ export function TranscriptPanel() {
     setTranscript,
     removeFillerWords,
     detectScenes,
+    addTranscriptCaptionsToTimeline,
     setPlayheadPosition,
     settings,
   } = useTimelineStore();
@@ -70,6 +72,11 @@ export function TranscriptPanel() {
     if (!activeTranscriptMediaId) return;
     detectScenes(activeTranscriptMediaId);
   }, [activeTranscriptMediaId, detectScenes]);
+
+  const handleAddCaptionsToTimeline = useCallback(() => {
+    if (!activeTranscriptMediaId) return;
+    addTranscriptCaptionsToTimeline(activeTranscriptMediaId);
+  }, [activeTranscriptMediaId, addTranscriptCaptionsToTimeline]);
 
   const fillerCount = activeTranscript
     ? activeTranscript.segments.reduce(
@@ -195,6 +202,17 @@ export function TranscriptPanel() {
           >
             <Layers size={11} />
             {t.transcript.detectScenes}
+          </button>
+
+          {/* Add captions to timeline */}
+          <button
+            onClick={handleAddCaptionsToTimeline}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors hover:opacity-80"
+            style={{ background: 'var(--accent)', color: 'white' }}
+            title="Add transcript as caption text overlays on the timeline"
+          >
+            <MessageSquarePlus size={11} />
+            {t.transcript.addCaptionsToTimeline ?? 'Add Captions'}
           </button>
         </div>
       )}

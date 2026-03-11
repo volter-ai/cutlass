@@ -31,6 +31,7 @@ export function TextOverlayClip({ overlay }: Props) {
       e.stopPropagation();
       selectTextOverlay(overlay.id);
       setIsDragging(true);
+      storeApi.temporal.getState().pause();
       dragStartRef.current = { x: e.clientX, startTime: overlay.startTime, duration: overlay.duration };
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -74,6 +75,7 @@ export function TextOverlayClip({ overlay }: Props) {
 
       const handleMouseUp = () => {
         setIsDragging(false);
+        storeApi.temporal.getState().resume();
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
       };

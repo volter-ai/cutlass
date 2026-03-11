@@ -114,6 +114,7 @@ export function TimelineClipComponent({ clip }: Props) {
 
       setIsDragging(true);
       let hasMoved = false;
+      storeApi.temporal.getState().pause();
 
       // Get the effective selection for this drag
       const effectiveSelection = storeApi.getState().selectedClipIds;
@@ -222,6 +223,7 @@ export function TimelineClipComponent({ clip }: Props) {
 
       const handleMouseUp = () => {
         setIsDragging(false);
+        storeApi.temporal.getState().resume();
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
 
@@ -242,6 +244,7 @@ export function TimelineClipComponent({ clip }: Props) {
       e.stopPropagation();
       const startX = e.clientX;
       const startFade = edge === 'in' ? clip.fadeIn : clip.fadeOut;
+      storeApi.temporal.getState().pause();
 
       const handleMove = (moveEvent: MouseEvent) => {
         const delta = (moveEvent.clientX - startX) / zoom;
@@ -252,6 +255,7 @@ export function TimelineClipComponent({ clip }: Props) {
       };
 
       const handleUp = () => {
+        storeApi.temporal.getState().resume();
         window.removeEventListener('mousemove', handleMove);
         window.removeEventListener('mouseup', handleUp);
       };

@@ -136,6 +136,7 @@ export const en = {
     top: 'top',
     center: 'center',
     bottom: 'bottom',
+    backgroundColor: 'Background',
     // Aspect ratio descriptions
     landscape: 'YouTube / Landscape',
     reels: 'Reels / TikTok / Shorts',
@@ -180,6 +181,7 @@ export const en = {
     speaker: 'Speaker',
     importToStart: 'Import media to get started',
     selectAndTranscribe: 'Select media and transcribe',
+    addCaptionsToTimeline: 'Add Captions',
   },
 
   // AI Edit

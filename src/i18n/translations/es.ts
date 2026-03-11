@@ -138,6 +138,7 @@ export const es: Translations = {
     top: 'arriba',
     center: 'centro',
     bottom: 'abajo',
+    backgroundColor: 'Fondo',
     // Aspect ratio descriptions
     landscape: 'YouTube / Horizontal',
     reels: 'Reels / TikTok / Shorts',
@@ -182,6 +183,7 @@ export const es: Translations = {
     speaker: 'Hablante',
     importToStart: 'Importa medios para comenzar',
     selectAndTranscribe: 'Selecciona un medio y transcr\u00edbelo',
+    addCaptionsToTimeline: 'A\u00f1adir subt\u00edtulos',
   },
 
   // AI Edit

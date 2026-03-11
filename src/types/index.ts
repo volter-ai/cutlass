@@ -125,6 +125,7 @@ export interface ProjectSettings {
   captionStyle: CaptionStyle;
   deepgramApiKey: string;
   openaiApiKey: string;
+  backgroundColor: string;
 }
 
 export const ASPECT_RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
