@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
 
-type Tab = 'basics' | 'advanced';
+type Tab = 'basics' | 'advanced' | 'updates';
 
 export function HelpOverlay() {
   const show = useTimelineStore((s) => s.showHelpOverlay);
@@ -69,6 +69,9 @@ export function HelpOverlay() {
           </button>
           <button style={tabStyle('advanced')} onClick={() => setActiveTab('advanced')}>
             {t.help.advanced}
+          </button>
+          <button style={tabStyle('updates')} onClick={() => setActiveTab('updates')}>
+            {t.help.updates}
           </button>
         </div>
 
@@ -149,6 +152,26 @@ export function HelpOverlay() {
                       </div>
                     ))}
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab === 'updates' && (
+            <div className="px-5 py-4 space-y-4">
+              {t.help.updateEntries.map((entry, i) => (
+                <div key={i} className="border-b pb-3" style={{ borderColor: 'var(--border)' }}>
+                  <div className="text-xs font-bold mb-1.5" style={{ color: 'var(--accent)' }}>
+                    {entry.date}
+                  </div>
+                  <ul className="space-y-1">
+                    {entry.items.map((item, j) => (
+                      <li key={j} className="text-xs flex gap-2" style={{ color: 'var(--text-secondary)' }}>
+                        <span style={{ color: 'var(--text-primary)' }}>•</span>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ))}
             </div>

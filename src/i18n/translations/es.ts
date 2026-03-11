@@ -199,14 +199,15 @@ export const es: Translations = {
     advanced: 'Avanzado',
     quickStart: 'Inicio r\u00e1pido',
     keyboardShortcuts: 'Atajos de teclado',
+    updates: 'Novedades',
     closeHint: 'Presiona ? o Esc para cerrar',
 
     // Quick Start steps
     steps: [
       { title: 'Importar medios', desc: 'Arrastra archivos de video o audio al panel de Medios, o haz clic en Importar.' },
       { title: 'Construir la l\u00ednea de tiempo', desc: 'Arrastra clips desde el panel de Medios a las pistas de la l\u00ednea de tiempo.' },
-      { title: 'Cortar y organizar', desc: 'Usa la herramienta Cortar (C) para dividir clips. Seleccionar (V) para moverlos.' },
-      { title: 'Ajustar audio y video', desc: 'Haz clic derecho en clips para volumen, fundidos, velocidad, efectos y m\u00e1s.' },
+      { title: 'Cortar y organizar', desc: 'Usa la herramienta Cortar (C) para dividir clips. Seleccionar (V) para moverlos. Ajuste (S) alinea clips a bordes.' },
+      { title: 'Ajustar audio y video', desc: 'Haz clic derecho en clips para volumen, fundidos, velocidad, transiciones, animaciones y m\u00e1s.' },
       { title: 'Transcribir y subtitular', desc: 'Abre la pesta\u00f1a Transcripci\u00f3n para auto-transcribir y generar subt\u00edtulos.' },
       { title: 'Exportar', desc: 'Haz clic en Exportar para renderizar tu video como MP4 o WebM a 720p, 1080p o 4K.' },
     ],
@@ -290,8 +291,8 @@ export const es: Translations = {
         items: [
           { label: 'Aplicar animaci\u00f3n', desc: 'Clic derecho en un clip de video > Animaci\u00f3n. Elige entre 11 preajustes.' },
           { label: 'Preajustes de fundido', desc: 'Fundido de entrada, Fundido de salida, Fundido entrada/salida \u2014 transiciones suaves de opacidad.' },
-          { label: 'Preajustes de movimiento', desc: 'Deslizar Izquierda/Derecha/Arriba/Abajo \u2014 el clip se desliza hacia el cuadro desde la direcci\u00f3n elegida.' },
-          { label: 'Preajustes de zoom', desc: 'Acercar, Alejar \u2014 cambio gradual de escala. Ken Burns \u2014 zoom lento con paneo.' },
+          { label: 'Preajustes de movimiento', desc: 'Deslizar Izquierda/Derecha/Arriba/Abajo \u2014 el clip se desliza hacia el cuadro (solo vista previa).' },
+          { label: 'Preajustes de zoom', desc: 'Acercar, Alejar \u2014 cambio gradual de escala. Ken Burns \u2014 zoom lento con paneo. Todos se exportan correctamente.' },
           { label: 'Vista previa', desc: 'Las animaciones se reproducen en tiempo real en el Visor al desplazar o reproducir la l\u00ednea de tiempo.' },
         ],
       },
@@ -300,6 +301,7 @@ export const es: Translations = {
         items: [
           { label: 'Aplicar', desc: 'Clic derecho en un clip de video > Transici\u00f3n de entrada / Transici\u00f3n de salida.' },
           { label: 'Tipos', desc: 'Disolvencia cruzada, Fundido a negro, Fundido desde negro \u2014 cada una con 0.5s de duraci\u00f3n predeterminada.' },
+          { label: 'Vista previa', desc: 'Las transiciones se previsualizan en tiempo real en el Visor como un efecto de fundido suave.' },
           { label: 'Audio vinculado', desc: 'Las transiciones de video aplican autom\u00e1ticamente fundidos de audio correspondientes a los clips de audio vinculados.' },
         ],
       },
@@ -314,9 +316,18 @@ export const es: Translations = {
         ],
       },
       {
+        title: 'Ajuste a la cuadr\u00edcula',
+        items: [
+          { label: 'Alternar', desc: 'Presiona S o haz clic en el \u00edcono de im\u00e1n en la barra de herramientas para activar o desactivar el ajuste.' },
+          { label: 'Comportamiento', desc: 'Cuando est\u00e1 activado, los bordes de los clips se ajustan a los bordes cercanos de otros clips o textos al arrastrar.' },
+          { label: 'Funciona en', desc: 'Mover clips, recortar inicio/fin, y mover/redimensionar textos respetan el ajuste.' },
+        ],
+      },
+      {
         title: 'Texto y subt\u00edtulos',
         items: [
-          { label: 'A\u00f1adir texto', desc: 'Doble clic en una pista de Texto, o cambia a la herramienta Texto (T) y haz clic en una pista de texto.' },
+          { label: 'A\u00f1adir texto', desc: 'Doble clic en una pista de Texto, o cambia a la herramienta Texto (T) y haz clic en una pista de texto. Escribe y presiona Enter.' },
+          { label: 'Vista previa en vivo', desc: 'Los textos superpuestos aparecen en el Visor en tiempo real en su posici\u00f3n y estilo configurados.' },
           { label: 'Subt\u00edtulos autom\u00e1ticos', desc: 'En la pesta\u00f1a Transcripci\u00f3n, haz clic en Transcribir, luego usa "Generar subt\u00edtulos" para subt\u00edtulos autom\u00e1ticos.' },
           { label: 'Estilos de subt\u00edtulos', desc: 'Ajustes > Estilo de subt\u00edtulos: elige entre Predeterminado, TikTok, YouTube o Minimal.' },
           { label: 'Incrustar subt\u00edtulos', desc: 'Activa "Incrustar subt\u00edtulos" en el di\u00e1logo de Exportar para insertar subt\u00edtulos directamente en el video.' },
@@ -337,6 +348,36 @@ export const es: Translations = {
           { label: 'Calidad', desc: '720p para borradores r\u00e1pidos, 1080p para HD est\u00e1ndar, 4K para calidad m\u00e1xima.' },
           { label: 'Audio', desc: 'Activa o desactiva "Incluir audio" para exportar con o sin la mezcla de audio.' },
           { label: 'Velocidad y efectos', desc: 'La velocidad del clip, animaciones de fundido y transiciones se incorporan al archivo exportado.' },
+        ],
+      },
+    ],
+
+    // Update log (most recent first)
+    updateEntries: [
+      {
+        date: '2026-03-11',
+        items: [
+          'El ajuste ahora funciona: clips y textos se alinean a bordes cercanos al arrastrar, recortar o redimensionar.',
+          'Los textos superpuestos ahora se muestran en vivo en el Visor con posici\u00f3n, fuente y estilo correctos.',
+          'Las transiciones (Disolvencia cruzada, Fundido a/desde negro) ahora se previsualizan en el Visor en tiempo real.',
+          'Animaciones Acercar, Alejar y Ken Burns ahora se exportan correctamente con filtros zoompan de FFmpeg.',
+          'TransitionOut ahora se aplica en la exportaci\u00f3n (antes solo se exportaba transitionIn).',
+          'Se reemplaz\u00f3 el di\u00e1logo prompt() con entrada de texto en l\u00ednea para crear textos en la l\u00ednea de tiempo.',
+          'Se a\u00f1adieron secciones de Ajuste y Texto a Ayuda > Avanzado, se actualizaron docs de Transiciones y Animaciones.',
+        ],
+      },
+      {
+        date: '2026-03-10',
+        items: [
+          'Se corrigieron m\u00e1s de 12 problemas de correcci\u00f3n en 4 revisiones de c\u00f3digo.',
+          'Todas las acciones del almac\u00e9n que cambian posiciones de clips ahora recalculan correctamente la duraci\u00f3n.',
+          'Se corrigi\u00f3 el audio doble para clips de video+audio vinculados en reproducci\u00f3n y exportaci\u00f3n.',
+          'Se corrigi\u00f3 el problema de clips fantasma al eliminar archivos de medios.',
+          'Se corrigi\u00f3 el desplazamiento del men\u00fa contextual y posicionamiento relativo a la ventana.',
+          'Se corrigi\u00f3 el problema de volumen afectando otras l\u00edneas de tiempo.',
+          'Se memorizaron c\u00e1lculos costosos de React (atajos, regla, barras de onda, clip activo).',
+          'Cach\u00e9 de conexi\u00f3n IndexedDB para recuperaci\u00f3n m\u00e1s r\u00e1pida de medios.',
+          'El panel de transcripci\u00f3n ahora muestra mensajes de error cuando la transcripci\u00f3n falla.',
         ],
       },
     ],

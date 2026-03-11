@@ -119,29 +119,65 @@ export function TimelineClipComponent({ clip }: Props) {
         const delta = (moveEvent.clientX - dragStartRef.current.x) / zoom;
 
         switch (type) {
-          case 'move':
+          case 'move': {
+            let newTime = Math.max(0, dragStartRef.current.startTime + delta);
+            const snapState = storeApi.getState();
+            if (snapState.snapEnabled) {
+              const points = snapState.getSnapPoints();
+              const threshold = 10 / zoom;
+              const dur = dragStartRef.current.duration;
+              let bestDist = threshold;
+              let snapped = newTime;
+              for (const sp of points) {
+                const dStart = Math.abs(newTime - sp);
+                if (dStart < bestDist) { snapped = sp; bestDist = dStart; }
+                const dEnd = Math.abs(newTime + dur - sp);
+                if (dEnd < bestDist) { snapped = sp - dur; bestDist = dEnd; }
+              }
+              newTime = Math.max(0, snapped);
+            }
             if (isMultiDrag) {
               const positions: Record<string, number> = {};
               for (const [id, initial] of Object.entries(initialPositions)) {
-                positions[id] = Math.max(0, initial + delta);
+                positions[id] = Math.max(0, initial + (newTime - dragStartRef.current.startTime));
               }
               moveClipsBatch(positions);
             } else {
-              moveClip(clip.id, Math.max(0, dragStartRef.current.startTime + delta));
+              moveClip(clip.id, newTime);
             }
             break;
+          }
           case 'trim-start': {
-            const newStart = Math.max(0, dragStartRef.current.startTime + delta);
+            let newStart = Math.max(0, dragStartRef.current.startTime + delta);
             const maxStart = dragStartRef.current.startTime + dragStartRef.current.duration - 0.1;
+            const snapState = storeApi.getState();
+            if (snapState.snapEnabled) {
+              const points = snapState.getSnapPoints();
+              const threshold = 10 / zoom;
+              let bestDist = threshold;
+              for (const sp of points) {
+                if (Math.abs(newStart - sp) < bestDist) { newStart = sp; bestDist = Math.abs(newStart - sp); }
+              }
+              newStart = Math.max(0, newStart);
+            }
             if (newStart < maxStart) {
               trimClipStart(clip.id, newStart);
             }
             break;
           }
           case 'trim-end': {
-            const newEnd =
+            let newEnd =
               dragStartRef.current.startTime + dragStartRef.current.duration + delta;
             const minEnd = clip.startTime + 0.1;
+            const snapState = storeApi.getState();
+            if (snapState.snapEnabled) {
+              const points = snapState.getSnapPoints();
+              const threshold = 10 / zoom;
+              let bestDist = threshold;
+              for (const sp of points) {
+                if (Math.abs(newEnd - sp) < bestDist) { newEnd = sp; bestDist = Math.abs(newEnd - sp); }
+              }
+            }
             if (newEnd > minEnd) {
               trimClipEnd(clip.id, newEnd);
             }

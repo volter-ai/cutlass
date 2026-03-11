@@ -197,14 +197,15 @@ export const en = {
     advanced: 'Advanced',
     quickStart: 'Quick Start',
     keyboardShortcuts: 'Keyboard Shortcuts',
+    updates: 'Updates',
     closeHint: 'Press ? or Esc to close',
 
     // Quick Start steps
     steps: [
       { title: 'Import media', desc: 'Drag video or audio files into the Media panel, or click Import.' },
       { title: 'Build your timeline', desc: 'Drag clips from the Media panel onto timeline tracks.' },
-      { title: 'Cut and arrange', desc: 'Use the Razor tool (C) to cut clips. Select tool (V) to move them.' },
-      { title: 'Fine-tune audio & video', desc: 'Right-click clips for volume, fades, speed, effects, and more.' },
+      { title: 'Cut and arrange', desc: 'Use the Razor tool (C) to cut clips. Select tool (V) to move them. Snap (S) aligns clips to edges.' },
+      { title: 'Fine-tune audio & video', desc: 'Right-click clips for volume, fades, speed, transitions, animations, and more.' },
       { title: 'Transcribe & caption', desc: 'Open the Transcript tab to auto-transcribe and generate captions.' },
       { title: 'Export', desc: 'Click Export to render your video as MP4 or WebM at 720p, 1080p, or 4K.' },
     ],
@@ -288,8 +289,8 @@ export const en = {
         items: [
           { label: 'Apply animation', desc: 'Right-click a video clip > Animation. Choose from 11 presets.' },
           { label: 'Fade presets', desc: 'Fade In, Fade Out, Fade In/Out \u2014 smooth opacity transitions.' },
-          { label: 'Motion presets', desc: 'Slide Left/Right/Up/Down \u2014 clip slides into frame from the chosen direction.' },
-          { label: 'Zoom presets', desc: 'Zoom In, Zoom Out \u2014 gradual scale change. Ken Burns \u2014 slow zoom with pan.' },
+          { label: 'Motion presets', desc: 'Slide Left/Right/Up/Down \u2014 clip slides into frame from the chosen direction (preview only).' },
+          { label: 'Zoom presets', desc: 'Zoom In, Zoom Out \u2014 gradual scale change. Ken Burns \u2014 slow zoom with pan. All export correctly.' },
           { label: 'Preview', desc: 'Animations play in real-time in the Viewer as you scrub or play the timeline.' },
         ],
       },
@@ -298,6 +299,7 @@ export const en = {
         items: [
           { label: 'Apply', desc: 'Right-click a video clip > Transition In / Transition Out.' },
           { label: 'Types', desc: 'Cross Dissolve, Fade to Black, Fade from Black \u2014 each with a 0.5s default duration.' },
+          { label: 'Preview', desc: 'Transitions preview in real-time in the Viewer as a smooth fade effect.' },
           { label: 'Linked audio', desc: 'Video transitions automatically apply matching audio fades to linked audio clips.' },
         ],
       },
@@ -312,9 +314,18 @@ export const en = {
         ],
       },
       {
+        title: 'Snap to Grid',
+        items: [
+          { label: 'Toggle', desc: 'Press S or click the magnet icon in the toolbar to turn Snap on or off.' },
+          { label: 'Behavior', desc: 'When enabled, clip edges snap to nearby clip or text overlay boundaries while dragging.' },
+          { label: 'Works on', desc: 'Clip move, trim start/end, and text overlay move/resize all respect snap.' },
+        ],
+      },
+      {
         title: 'Text & Captions',
         items: [
-          { label: 'Add text', desc: 'Double-click on a Text track, or switch to the Text tool (T) and click a text track.' },
+          { label: 'Add text', desc: 'Double-click on a Text track, or switch to the Text tool (T) and click a text track. Type and press Enter.' },
+          { label: 'Live preview', desc: 'Text overlays appear in the Viewer in real-time at their configured position and style.' },
           { label: 'Auto-captions', desc: 'In Transcript tab, click Transcribe, then use "Generate Captions" for auto-placed subtitles.' },
           { label: 'Caption styles', desc: 'Settings > Caption Style: choose Default, TikTok, YouTube, or Minimal presets.' },
           { label: 'Burn captions', desc: 'Enable "Burn Captions" in the Export dialog to embed subtitles directly in the video.' },
@@ -335,6 +346,36 @@ export const en = {
           { label: 'Quality', desc: '720p for quick drafts, 1080p for standard HD, 4K for maximum quality.' },
           { label: 'Audio', desc: 'Toggle "Include Audio" to export with or without the audio mix.' },
           { label: 'Speed & effects', desc: 'Clip speed, fade animations, and transitions are baked into the exported file.' },
+        ],
+      },
+    ],
+
+    // Update log (most recent first)
+    updateEntries: [
+      {
+        date: '2026-03-11',
+        items: [
+          'Snap now works: clips and text overlays snap to nearby edges while dragging, trimming, or resizing.',
+          'Text overlays now render live in the Viewer preview with correct position, font, and style.',
+          'Transitions (Cross Dissolve, Fade to/from Black) now preview in the Viewer in real-time.',
+          'Zoom-in, Zoom-out, and Ken Burns animations now export correctly via FFmpeg zoompan filters.',
+          'TransitionOut now applied in export (previously only transitionIn was exported).',
+          'Replaced blocking prompt() with inline text input for creating text overlays on timeline.',
+          'Added Snap and Text sections to Help > Advanced, updated Transitions and Animations docs.',
+        ],
+      },
+      {
+        date: '2026-03-10',
+        items: [
+          'Fixed 12+ correctness issues across 4 code review passes.',
+          'All store actions that change clip positions now correctly recalculate timeline duration.',
+          'Fixed double-audio for linked video+audio clips in both playback and export.',
+          'Fixed ghost clips remaining after media file deletion.',
+          'Fixed context menu scrolling and viewport-aware positioning.',
+          'Fixed volume changes affecting other timelines via linked clips.',
+          'Memoized expensive React computations (keyboard shortcuts, ruler ticks, waveform bars, activeClip).',
+          'IndexedDB connection caching for faster media recovery.',
+          'Transcript panel now shows error messages when transcription fails.',
         ],
       },
     ],

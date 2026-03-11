@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { Maximize2 } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
@@ -77,7 +77,21 @@ export function Viewer() {
   const clips = useTimelineStore((s) => s.clips);
   const tracks = useTimelineStore((s) => s.tracks);
   const mediaFiles = useTimelineStore((s) => s.mediaFiles);
+  const textOverlays = useTimelineStore((s) => s.textOverlays);
+  const resolution = useTimelineStore((s) => s.settings.resolution);
   const { t } = useLanguage();
+
+  // Track container width for scaling text overlays
+  const [containerWidth, setContainerWidth] = useState(640);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      setContainerWidth(entries[0].contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Find the active video clip at the current playhead position
   const activeClip = useMemo(() => {
@@ -102,6 +116,32 @@ export function Viewer() {
     const progress = (playheadPosition - activeClip.startTime) / activeClip.duration;
     return getAnimationStyle(activeClip.animation?.preset, Math.max(0, Math.min(1, progress)));
   }, [activeClip, playheadPosition]);
+
+  // Compute transition opacity (transitionIn / transitionOut)
+  const transitionOpacity = useMemo(() => {
+    if (!activeClip) return 1;
+    const elapsed = playheadPosition - activeClip.startTime;
+    let opacity = 1;
+    if (activeClip.transitionIn) {
+      const d = activeClip.transitionIn.duration;
+      if (elapsed < d) opacity *= elapsed / d;
+    }
+    if (activeClip.transitionOut) {
+      const d = activeClip.transitionOut.duration;
+      const remaining = activeClip.duration - elapsed;
+      if (remaining < d) opacity *= remaining / d;
+    }
+    return Math.max(0, opacity);
+  }, [activeClip, playheadPosition]);
+
+  // Text overlays active at current playhead
+  const activeTextOverlays = useMemo(() => {
+    return Object.values(textOverlays).filter(
+      (o) => playheadPosition >= o.startTime && playheadPosition < o.startTime + o.duration,
+    );
+  }, [textOverlays, playheadPosition]);
+
+  const fontScale = containerWidth / resolution.width;
 
   // Sync video element with playhead
   useEffect(() => {
@@ -187,7 +227,7 @@ export function Viewer() {
                 : activeClip?.fitMode === 'stretch' ? 'fill'
                 : 'contain',
               transform: combinedTransform || undefined,
-              opacity: animStyle.opacity,
+              opacity: animStyle.opacity * transitionOpacity,
             }}
             muted
             playsInline
@@ -198,6 +238,34 @@ export function Viewer() {
             <p className="text-xs mt-1">{t.viewer.importMedia}</p>
           </div>
         )}
+
+        {/* Text overlays */}
+        {activeTextOverlays.map((overlay) => (
+          <div
+            key={overlay.id}
+            style={{
+              position: 'absolute',
+              left: `${overlay.style.x}%`,
+              top: `${overlay.style.y}%`,
+              transform: 'translate(-50%, -50%)',
+              fontFamily: overlay.style.fontFamily,
+              fontSize: Math.round(overlay.style.fontSize * fontScale),
+              fontWeight: overlay.style.fontWeight,
+              color: overlay.style.color,
+              textAlign: overlay.style.textAlign,
+              backgroundColor: overlay.style.backgroundColor !== 'transparent' ? overlay.style.backgroundColor : undefined,
+              padding: overlay.style.backgroundColor !== 'transparent' ? '4px 8px' : undefined,
+              textShadow: overlay.style.outline
+                ? `-1px -1px 0 ${overlay.style.outlineColor}, 1px -1px 0 ${overlay.style.outlineColor}, -1px 1px 0 ${overlay.style.outlineColor}, 1px 1px 0 ${overlay.style.outlineColor}`
+                : undefined,
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+              zIndex: 10,
+            }}
+          >
+            {overlay.text}
+          </div>
+        ))}
       </div>
     </div>
   );

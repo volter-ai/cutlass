@@ -1,5 +1,5 @@
 import { useRef, useCallback, useState } from 'react';
-import { useTimelineStore } from '../../store/timeline';
+import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import type { TextOverlay } from '../../types';
 
 interface Props {
@@ -10,6 +10,7 @@ export function TextOverlayClip({ overlay }: Props) {
   const zoom = useTimelineStore((s) => s.zoom);
   const selectedTextOverlayId = useTimelineStore((s) => s.selectedTextOverlayId);
   const { selectTextOverlay, updateTextOverlay } = useTimelineStore();
+  const storeApi = useTimelineStoreApi();
 
   const clipRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -27,12 +28,38 @@ export function TextOverlayClip({ overlay }: Props) {
       dragStartRef.current = { x: e.clientX, startTime: overlay.startTime, duration: overlay.duration };
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
-        // delta is always computed from the drag-start position (not incremental)
         const delta = (moveEvent.clientX - dragStartRef.current.x) / zoom;
+        const snapState = storeApi.getState();
+        const doSnap = snapState.snapEnabled;
+        const points = doSnap ? snapState.getSnapPoints() : [];
+        const threshold = 10 / zoom;
+
         if (type === 'move') {
-          updateTextOverlay(overlay.id, { startTime: Math.max(0, dragStartRef.current.startTime + delta) });
+          let newTime = Math.max(0, dragStartRef.current.startTime + delta);
+          if (doSnap) {
+            const dur = dragStartRef.current.duration;
+            let bestDist = threshold;
+            let snapped = newTime;
+            for (const sp of points) {
+              const dStart = Math.abs(newTime - sp);
+              if (dStart < bestDist) { snapped = sp; bestDist = dStart; }
+              const dEnd = Math.abs(newTime + dur - sp);
+              if (dEnd < bestDist) { snapped = sp - dur; bestDist = dEnd; }
+            }
+            newTime = Math.max(0, snapped);
+          }
+          updateTextOverlay(overlay.id, { startTime: newTime });
         } else {
-          const newDuration = dragStartRef.current.duration + delta;
+          let newDuration = dragStartRef.current.duration + delta;
+          if (doSnap) {
+            const endTime = dragStartRef.current.startTime + newDuration;
+            let bestDist = threshold;
+            let snappedEnd = endTime;
+            for (const sp of points) {
+              if (Math.abs(endTime - sp) < bestDist) { snappedEnd = sp; bestDist = Math.abs(endTime - sp); }
+            }
+            newDuration = snappedEnd - dragStartRef.current.startTime;
+          }
           if (newDuration > 0.5) {
             updateTextOverlay(overlay.id, { duration: newDuration });
           }
