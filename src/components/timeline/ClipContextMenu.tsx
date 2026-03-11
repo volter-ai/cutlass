@@ -107,10 +107,14 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
   const speedLabel = (opt: { label?: string; value: number }) =>
     opt.value === 1 ? cm.normal : (opt.label ?? `${opt.value}x`);
 
+  const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const maxMenuHeight = viewportHeight - 16;
+  const adjustedTop = Math.min(position.y, viewportHeight - Math.min(maxMenuHeight, 400) - 8);
+
   const menuStyle: React.CSSProperties = {
     position: 'fixed',
     left: position.x,
-    top: position.y,
+    top: adjustedTop,
     zIndex: 9999,
     background: 'var(--bg-secondary)',
     border: '1px solid var(--border)',
@@ -118,6 +122,8 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
     padding: '4px 0',
     minWidth: 200,
     boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+    maxHeight: maxMenuHeight,
+    overflowY: 'auto',
   };
 
   const itemStyle: React.CSSProperties = {

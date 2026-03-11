@@ -248,6 +248,13 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         removeMediaFile: (id) => {
           set((state) => {
             delete state.mediaFiles[id];
+            // Remove all timeline clips that reference this media file
+            for (const clipId of Object.keys(state.clips)) {
+              if (state.clips[clipId].mediaFileId === id) {
+                delete state.clips[clipId];
+              }
+            }
+            state.selectedClipIds = state.selectedClipIds.filter((clipId) => !!state.clips[clipId]);
           });
           // Remove from IndexedDB (fire-and-forget)
           import('../services/mediaStorage').then((ms) =>
@@ -395,7 +402,17 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         setClipVolume: (clipId, volume) =>
           set((state) => {
             const clip = state.clips[clipId];
-            if (clip) clip.volume = Math.max(0, Math.min(2, volume));
+            if (!clip) return;
+            clip.volume = Math.max(0, Math.min(2, volume));
+            // Sync linked clip volume (e.g. extracted audio), consistent with setClipSpeed
+            if (clip.linkedGroupId) {
+              const linked = Object.values(state.clips).find(
+                (c) => c.id !== clipId && c.linkedGroupId === clip.linkedGroupId,
+              );
+              if (linked) {
+                linked.volume = clip.volume;
+              }
+            }
           }),
 
         setClipSpeed: (clipId, speed) =>

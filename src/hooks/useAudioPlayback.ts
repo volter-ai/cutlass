@@ -49,10 +49,25 @@ export function useAudioPlayback() {
   useEffect(() => {
     const sources = audioSourcesRef.current;
 
-    // Find all audio-contributing clips (audio tracks + video tracks with audio)
+    // Build a set of linkedGroupIds that have a dedicated audio clip,
+    // so the paired video clip doesn't produce double audio.
+    const linkedGroupsWithAudio = new Set<string>();
+    for (const clip of Object.values(clips)) {
+      const track = tracks.find((t) => t.id === clip.trackId);
+      if (track?.type === 'audio' && clip.linkedGroupId) {
+        linkedGroupsWithAudio.add(clip.linkedGroupId);
+      }
+    }
+
+    // Find all audio-contributing clips (audio tracks + video tracks with audio).
+    // Skip video clips whose audio has been extracted to a linked audio clip —
+    // the audio clip on the audio track is the sole audio source for that pair.
     const audioClips = Object.values(clips).filter((clip) => {
       const track = tracks.find((t) => t.id === clip.trackId);
       if (!track || track.muted) return false;
+      if (track.type === 'video' && clip.linkedGroupId && linkedGroupsWithAudio.has(clip.linkedGroupId)) {
+        return false;
+      }
       return track.type === 'audio' || track.type === 'video';
     });
 
