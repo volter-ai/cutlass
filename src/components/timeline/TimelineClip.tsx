@@ -1,6 +1,6 @@
 import { useRef, useCallback, useState } from 'react';
 import { Link, AlertTriangle } from 'lucide-react';
-import { useTimelineStore } from '../../store/timeline';
+import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { ClipContextMenu } from './ClipContextMenu';
 import { createMediaFile } from '../../utils/media';
 import type { TimelineClip as TClip } from '../../types';
@@ -17,6 +17,7 @@ export function TimelineClipComponent({ clip }: Props) {
   const {
     selectClip,
     moveClip,
+    moveClipsBatch,
     trimClipStart,
     trimClipEnd,
     splitClipAtPlayhead,
@@ -25,6 +26,7 @@ export function TimelineClipComponent({ clip }: Props) {
     addMediaFile,
   } = useTimelineStore();
 
+  const storeApi = useTimelineStoreApi();
   const isMissing = !mediaFiles[clip.mediaFileId];
 
   const clipRef = useRef<HTMLDivElement>(null);
@@ -57,8 +59,35 @@ export function TimelineClipComponent({ clip }: Props) {
       }
 
       e.stopPropagation();
-      selectClip(clip.id, e.shiftKey);
+
+      const wasAlreadySelected = selectedClipIds.includes(clip.id);
+      let shouldDeferDeselect = false;
+
+      if (e.shiftKey) {
+        selectClip(clip.id, true);
+      } else if (wasAlreadySelected && selectedClipIds.length > 1) {
+        // Already part of multi-selection: defer deselect until mouseup (allows multi-drag)
+        shouldDeferDeselect = true;
+      } else if (!wasAlreadySelected) {
+        selectClip(clip.id, false);
+      }
+
       setIsDragging(true);
+      let hasMoved = false;
+
+      // Get the effective selection for this drag
+      const effectiveSelection = storeApi.getState().selectedClipIds;
+      const isMultiDrag = type === 'move' && effectiveSelection.length > 1;
+
+      // Capture initial positions for multi-drag
+      const initialPositions: Record<string, number> = {};
+      if (isMultiDrag) {
+        const currentClips = storeApi.getState().clips;
+        for (const id of effectiveSelection) {
+          if (currentClips[id]) initialPositions[id] = currentClips[id].startTime;
+        }
+      }
+
       dragStartRef.current = {
         x: e.clientX,
         startTime: clip.startTime,
@@ -67,11 +96,20 @@ export function TimelineClipComponent({ clip }: Props) {
       };
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
+        hasMoved = true;
         const delta = (moveEvent.clientX - dragStartRef.current.x) / zoom;
 
         switch (type) {
           case 'move':
-            moveClip(clip.id, Math.max(0, dragStartRef.current.startTime + delta));
+            if (isMultiDrag) {
+              const positions: Record<string, number> = {};
+              for (const [id, initial] of Object.entries(initialPositions)) {
+                positions[id] = Math.max(0, initial + delta);
+              }
+              moveClipsBatch(positions);
+            } else {
+              moveClip(clip.id, Math.max(0, dragStartRef.current.startTime + delta));
+            }
             break;
           case 'trim-start': {
             const newStart = Math.max(0, dragStartRef.current.startTime + delta);
@@ -97,12 +135,17 @@ export function TimelineClipComponent({ clip }: Props) {
         setIsDragging(false);
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
+
+        // If we deferred deselection and didn't drag, select just this clip
+        if (shouldDeferDeselect && !hasMoved) {
+          selectClip(clip.id, false);
+        }
       };
 
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
     },
-    [activeTool, clip, zoom, selectClip, moveClip, trimClipStart, trimClipEnd, splitClipAtPlayhead, setPlayheadPosition],
+    [activeTool, clip, zoom, selectedClipIds, selectClip, moveClip, moveClipsBatch, trimClipStart, trimClipEnd, splitClipAtPlayhead, setPlayheadPosition, storeApi],
   );
 
   const handleFadeDrag = useCallback(
@@ -225,6 +268,32 @@ export function TimelineClipComponent({ clip }: Props) {
             style={{ height: 1, background: '#fbbf24' }}
           />
         </div>
+
+        {/* Speed badge */}
+        {(clip.speed ?? 1) !== 1 && (
+          <div
+            className="absolute bottom-0.5 left-1 z-10 pointer-events-none px-0.5 rounded"
+            style={{ background: 'rgba(0,0,0,0.6)', fontSize: 8, color: '#fbbf24', lineHeight: '12px' }}
+          >
+            {clip.speed}x
+          </div>
+        )}
+
+        {/* Animation badge */}
+        {clip.animation && clip.animation.preset !== 'none' && (
+          <div
+            className="absolute bottom-0.5 z-10 pointer-events-none px-0.5 rounded"
+            style={{
+              left: (clip.speed ?? 1) !== 1 ? 30 : 4,
+              background: 'rgba(0,0,0,0.6)',
+              fontSize: 8,
+              color: '#a78bfa',
+              lineHeight: '12px',
+            }}
+          >
+            {clip.animation.preset}
+          </div>
+        )}
 
         {/* Linked indicator */}
         {clip.linkedGroupId && (

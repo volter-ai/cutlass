@@ -14,6 +14,7 @@ import type {
   Tool,
   FillerRemovalMode,
   Transition,
+  ClipAnimation,
   AspectRatio,
   ProjectSettings,
   CaptionStyle,
@@ -102,11 +103,16 @@ export interface TimelineState {
   ) => string;
   removeClip: (clipId: string) => void;
   moveClip: (clipId: string, newStartTime: number, newTrackId?: string) => void;
+  moveClipsBatch: (positions: Record<string, number>) => void;
   trimClipStart: (clipId: string, newStartTime: number) => void;
   trimClipEnd: (clipId: string, newEndTime: number) => void;
   splitClipAtPlayhead: (clipId: string) => void;
   rippleDelete: (clipId: string) => void;
   setClipVolume: (clipId: string, volume: number) => void;
+  setClipSpeed: (clipId: string, speed: number) => void;
+  setClipFitMode: (clipId: string, fitMode: 'fit' | 'fill' | 'stretch') => void;
+  setClipTransform: (clipId: string, transform: { scale?: number; positionX?: number; positionY?: number }) => void;
+  setClipAnimation: (clipId: string, animation: ClipAnimation | undefined) => void;
   setClipFade: (clipId: string, edge: 'in' | 'out', duration: number) => void;
   setClipTransition: (clipId: string, edge: 'in' | 'out', transition: Transition | undefined) => void;
   extractAudioFromClip: (clipId: string) => string | null;
@@ -133,6 +139,7 @@ export interface TimelineState {
 
   // Actions - Selection
   selectClip: (clipId: string, multi?: boolean) => void;
+  selectClips: (clipIds: string[]) => void;
   clearSelection: () => void;
   setActiveTool: (tool: Tool) => void;
 
@@ -265,6 +272,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
               name: mediaFile.name,
               type: mediaFile.type === 'audio' ? 'audio' : 'video',
               volume: 1,
+              speed: 1,
               fadeIn: 0,
               fadeOut: 0,
             };
@@ -294,6 +302,28 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
               );
               if (linked) {
                 linked.startTime = Math.max(0, linked.startTime + delta);
+              }
+            }
+          }),
+
+        moveClipsBatch: (positions) =>
+          set((state) => {
+            const processed = new Set<string>();
+            for (const [clipId, newStartTime] of Object.entries(positions)) {
+              if (processed.has(clipId)) continue;
+              const clip = state.clips[clipId];
+              if (!clip) continue;
+              const delta = Math.max(0, newStartTime) - clip.startTime;
+              clip.startTime = Math.max(0, newStartTime);
+              processed.add(clipId);
+              if (clip.linkedGroupId) {
+                const linked = Object.values(state.clips).find(
+                  (c) => c.id !== clipId && c.linkedGroupId === clip.linkedGroupId,
+                );
+                if (linked && !processed.has(linked.id) && !(linked.id in positions)) {
+                  linked.startTime = Math.max(0, linked.startTime + delta);
+                  processed.add(linked.id);
+                }
               }
             }
           }),
@@ -331,10 +361,11 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
               trackId: clip.trackId,
               startTime: playhead,
               duration: clip.duration - splitPoint,
-              mediaOffset: clip.mediaOffset + splitPoint,
+              mediaOffset: clip.mediaOffset + splitPoint * clip.speed,
               name: clip.name,
               type: clip.type,
               volume: clip.volume,
+              speed: clip.speed,
               fadeIn: 0,
               fadeOut: clip.fadeOut,
             };
@@ -365,6 +396,37 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           set((state) => {
             const clip = state.clips[clipId];
             if (clip) clip.volume = Math.max(0, Math.min(2, volume));
+          }),
+
+        setClipSpeed: (clipId, speed) =>
+          set((state) => {
+            const clip = state.clips[clipId];
+            if (!clip) return;
+            const clampedSpeed = Math.max(0.25, Math.min(4, speed));
+            // Adjust duration to keep the same source media range
+            clip.duration = clip.duration * (clip.speed / clampedSpeed);
+            clip.speed = clampedSpeed;
+          }),
+
+        setClipFitMode: (clipId, fitMode) =>
+          set((state) => {
+            const clip = state.clips[clipId];
+            if (clip) clip.fitMode = fitMode;
+          }),
+
+        setClipTransform: (clipId, transform) =>
+          set((state) => {
+            const clip = state.clips[clipId];
+            if (!clip) return;
+            if (transform.scale !== undefined) clip.scale = Math.max(0.1, Math.min(4, transform.scale));
+            if (transform.positionX !== undefined) clip.positionX = Math.max(-100, Math.min(100, transform.positionX));
+            if (transform.positionY !== undefined) clip.positionY = Math.max(-100, Math.min(100, transform.positionY));
+          }),
+
+        setClipAnimation: (clipId, animation) =>
+          set((state) => {
+            const clip = state.clips[clipId];
+            if (clip) clip.animation = animation;
           }),
 
         setClipFade: (clipId, edge, duration) =>
@@ -432,6 +494,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
               name: `${clip.name} (audio)`,
               type: 'audio',
               volume: clip.volume,
+              speed: clip.speed,
               fadeIn: clip.fadeIn,
               fadeOut: clip.fadeOut,
               linkedGroupId: groupId,
@@ -590,6 +653,12 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             state.selectedTextOverlayId = null;
           }),
 
+        selectClips: (clipIds) =>
+          set((state) => {
+            state.selectedTextOverlayId = null;
+            state.selectedClipIds = clipIds;
+          }),
+
         setActiveTool: (tool) =>
           set((state) => {
             state.activeTool = tool;
@@ -660,6 +729,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                       name: clip.name,
                       type: clip.type,
                       volume: clip.volume,
+                      speed: clip.speed,
                       fadeIn: 0,
                       fadeOut: clip.fadeOut,
                     };

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Unlink, AudioLines, Scissors, ChevronRight } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
+import type { AnimationPreset } from '../../types';
 
 interface Props {
   clipId: string;
@@ -16,6 +17,30 @@ const FADE_OPTIONS = [
   { label: '2s', value: 2 },
 ];
 
+const SPEED_OPTIONS = [
+  { label: '0.25x', value: 0.25 },
+  { label: '0.5x', value: 0.5 },
+  { label: '0.75x', value: 0.75 },
+  { label: '1x (Normal)', value: 1 },
+  { label: '1.5x', value: 1.5 },
+  { label: '2x', value: 2 },
+  { label: '4x', value: 4 },
+];
+
+const ANIMATION_PRESETS: { label: string; value: AnimationPreset }[] = [
+  { label: 'None', value: 'none' },
+  { label: 'Fade In', value: 'fade-in' },
+  { label: 'Fade Out', value: 'fade-out' },
+  { label: 'Fade In/Out', value: 'fade-in-out' },
+  { label: 'Slide Left', value: 'slide-left' },
+  { label: 'Slide Right', value: 'slide-right' },
+  { label: 'Slide Up', value: 'slide-up' },
+  { label: 'Slide Down', value: 'slide-down' },
+  { label: 'Zoom In', value: 'zoom-in' },
+  { label: 'Zoom Out', value: 'zoom-out' },
+  { label: 'Ken Burns', value: 'ken-burns' },
+];
+
 const TRANSITION_TYPES = [
   { label: 'Cross Dissolve', value: 'cross-dissolve' as const },
   { label: 'Fade to Black', value: 'fade-to-black' as const },
@@ -29,6 +54,10 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
     extractAudioFromClip,
     unlinkClips,
     setClipFade,
+    setClipSpeed,
+    setClipFitMode,
+    setClipTransform,
+    setClipAnimation,
     setClipTransition,
     setClipVolume,
     removeClip,
@@ -65,6 +94,10 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
 
   const isVideo = clip.type === 'video';
   const isLinked = !!clip.linkedGroupId;
+  const clipSpeed = clip.speed ?? 1;
+  const clipAnimationPreset = clip.animation?.preset ?? 'none';
+  const clipFitMode = clip.fitMode ?? 'fit';
+  const clipScale = clip.scale ?? 1;
 
   const menuStyle: React.CSSProperties = {
     position: 'fixed',
@@ -92,7 +125,6 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
     background: 'none',
     textAlign: 'left',
   };
-
 
   const separatorStyle: React.CSSProperties = {
     height: 1,
@@ -139,6 +171,129 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
       )}
 
       {(isVideo || isLinked) && <div style={separatorStyle} />}
+
+      {/* Speed */}
+      <div
+        className="relative"
+        onMouseEnter={() => setOpenSub('speed')}
+      >
+        <div style={itemStyle}>
+          <span style={{ flex: 1 }}>Speed</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+            {clipSpeed}x
+          </span>
+          <ChevronRight size={10} />
+        </div>
+        {openSub === 'speed' && (
+          <div style={subMenuStyle}>
+            {SPEED_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                style={{
+                  ...itemStyle,
+                  fontWeight: clipSpeed === opt.value ? 'bold' : 'normal',
+                  color: clipSpeed === opt.value ? 'var(--accent)' : 'var(--text-primary)',
+                }}
+                onClick={() => handleAction(() => setClipSpeed(clipId, opt.value))}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Fit Mode (video only) */}
+      {isVideo && (
+        <div
+          className="relative"
+          onMouseEnter={() => setOpenSub('fitMode')}
+        >
+          <div style={itemStyle}>
+            <span style={{ flex: 1 }}>Fit Mode</span>
+            <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+              {clipFitMode.charAt(0).toUpperCase() + clipFitMode.slice(1)}
+            </span>
+            <ChevronRight size={10} />
+          </div>
+          {openSub === 'fitMode' && (
+            <div style={subMenuStyle}>
+              {(['fit', 'fill', 'stretch'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  style={{
+                    ...itemStyle,
+                    fontWeight: clipFitMode === mode ? 'bold' : 'normal',
+                    color: clipFitMode === mode ? 'var(--accent)' : 'var(--text-primary)',
+                  }}
+                  onClick={() => handleAction(() => setClipFitMode(clipId, mode))}
+                >
+                  {mode === 'fit' ? 'Fit (Letterbox)' : mode === 'fill' ? 'Fill (Crop)' : 'Stretch'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Scale slider (video only) */}
+      {isVideo && (
+        <div style={{ ...itemStyle, cursor: 'default' }} onMouseEnter={() => setOpenSub(null)}>
+          <span style={{ fontSize: 12 }}>Scale</span>
+          <input
+            type="range"
+            min={10}
+            max={400}
+            value={Math.round(clipScale * 100)}
+            onChange={(e) => setClipTransform(clipId, { scale: Number(e.target.value) / 100 })}
+            style={{ flex: 1, height: 4, accentColor: 'var(--accent)' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <span style={{ fontSize: 11, color: 'var(--text-secondary)', minWidth: 32, textAlign: 'right' }}>
+            {Math.round(clipScale * 100)}%
+          </span>
+        </div>
+      )}
+
+      {/* Animation (video only) */}
+      {isVideo && (
+        <div
+          className="relative"
+          onMouseEnter={() => setOpenSub('animation')}
+        >
+          <div style={itemStyle}>
+            <span style={{ flex: 1 }}>Animation</span>
+            <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+              {ANIMATION_PRESETS.find((p) => p.value === clipAnimationPreset)?.label ?? 'None'}
+            </span>
+            <ChevronRight size={10} />
+          </div>
+          {openSub === 'animation' && (
+            <div style={{ ...subMenuStyle, maxHeight: 260, overflowY: 'auto' }}>
+              {ANIMATION_PRESETS.map((opt) => (
+                <button
+                  key={opt.value}
+                  style={{
+                    ...itemStyle,
+                    fontWeight: clipAnimationPreset === opt.value ? 'bold' : 'normal',
+                    color: clipAnimationPreset === opt.value ? 'var(--accent)' : 'var(--text-primary)',
+                  }}
+                  onClick={() =>
+                    handleAction(() =>
+                      setClipAnimation(
+                        clipId,
+                        opt.value === 'none' ? undefined : { preset: opt.value },
+                      ),
+                    )
+                  }
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Fade In */}
       <div
@@ -327,4 +482,3 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
     </div>
   );
 }
-

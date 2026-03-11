@@ -126,16 +126,66 @@ export async function exportTimeline(
   videoClips.forEach((clip, i) => {
     const trimLabel = `v${i}`;
     const scaledLabel = `vs${i}`;
+    const speed = clip.speed ?? 1;
+    const sourceDuration = clip.duration * speed;
 
-    // Trim the input
-    filterParts.push(
-      `[${clip.inputIdx}:v]trim=start=${clip.mediaOffset}:duration=${clip.duration},setpts=PTS-STARTPTS[${trimLabel}]`,
-    );
+    // Trim the input and apply speed
+    if (speed !== 1) {
+      filterParts.push(
+        `[${clip.inputIdx}:v]trim=start=${clip.mediaOffset}:duration=${sourceDuration},setpts=(PTS-STARTPTS)/${speed}[${trimLabel}]`,
+      );
+    } else {
+      filterParts.push(
+        `[${clip.inputIdx}:v]trim=start=${clip.mediaOffset}:duration=${sourceDuration},setpts=PTS-STARTPTS[${trimLabel}]`,
+      );
+    }
 
-    // Scale to fit canvas
-    filterParts.push(
-      `[${trimLabel}]scale=${resolution.width}:${resolution.height}:force_original_aspect_ratio=decrease,pad=${resolution.width}:${resolution.height}:(ow-iw)/2:(oh-ih)/2[${scaledLabel}]`,
-    );
+    // Scale to fit canvas based on fitMode
+    const fitMode = clip.fitMode ?? 'fit';
+    const clipScale = clip.scale ?? 1;
+    const sw = Math.round(resolution.width * clipScale);
+    const sh = Math.round(resolution.height * clipScale);
+    const posX = clip.positionX ?? 0;
+    const posY = clip.positionY ?? 0;
+
+    if (fitMode === 'fill') {
+      // Scale to cover, then crop to canvas size
+      filterParts.push(
+        `[${trimLabel}]scale=${sw}:${sh}:force_original_aspect_ratio=increase,crop=${resolution.width}:${resolution.height}:${Math.round(posX * resolution.width / 200 + (sw - resolution.width) / 2)}:${Math.round(posY * resolution.height / 200 + (sh - resolution.height) / 2)}[${scaledLabel}]`,
+      );
+    } else if (fitMode === 'stretch') {
+      filterParts.push(
+        `[${trimLabel}]scale=${sw}:${sh},pad=${resolution.width}:${resolution.height}:(ow-iw)/2:(oh-ih)/2[${scaledLabel}]`,
+      );
+    } else {
+      // fit (letterbox) - default
+      filterParts.push(
+        `[${trimLabel}]scale=${sw}:${sh}:force_original_aspect_ratio=decrease,pad=${resolution.width}:${resolution.height}:(ow-iw)/2:(oh-ih)/2[${scaledLabel}]`,
+      );
+    }
+
+    // Apply clip animation effects (fade-based)
+    let animLabel = scaledLabel;
+    const anim = clip.animation?.preset;
+    if (anim && anim !== 'none') {
+      const animOut = `${scaledLabel}an`;
+      const dur = clip.duration;
+      const fadeInDur = Math.min(dur / 3, 1);
+      const fadeOutDur = Math.min(dur / 3, 1);
+
+      if (anim === 'fade-in') {
+        filterParts.push(`[${animLabel}]fade=t=in:st=0:d=${fadeInDur}[${animOut}]`);
+        animLabel = animOut;
+      } else if (anim === 'fade-out') {
+        filterParts.push(`[${animLabel}]fade=t=out:st=${dur - fadeOutDur}:d=${fadeOutDur}[${animOut}]`);
+        animLabel = animOut;
+      } else if (anim === 'fade-in-out') {
+        filterParts.push(`[${animLabel}]fade=t=in:st=0:d=${fadeInDur},fade=t=out:st=${dur - fadeOutDur}:d=${fadeOutDur}[${animOut}]`);
+        animLabel = animOut;
+      }
+      // zoom-in, zoom-out, ken-burns: complex zoompan filters omitted for export performance
+      // These are rendered via CSS in the preview viewer
+    }
 
     // Overlay with enable timing
     const outLabel = `ov${i}`;
@@ -147,10 +197,10 @@ export async function exportTimeline(
       const fadeIn = clip.transitionIn;
       if (fadeIn.type === 'cross-dissolve' || fadeIn.type === 'fade-from-black') {
         filterParts.push(
-          `[${scaledLabel}]fade=t=in:st=0:d=${fadeIn.duration}[${scaledLabel}f]`,
+          `[${animLabel}]fade=t=in:st=0:d=${fadeIn.duration}[${animLabel}f]`,
         );
         filterParts.push(
-          `${overlayLabel}[${scaledLabel}f]${overlayFilter}[${outLabel}]`,
+          `${overlayLabel}[${animLabel}f]${overlayFilter}[${outLabel}]`,
         );
         overlayLabel = `[${outLabel}]`;
         return;
@@ -158,7 +208,7 @@ export async function exportTimeline(
     }
 
     filterParts.push(
-      `${overlayLabel}[${scaledLabel}]${overlayFilter}[${outLabel}]`,
+      `${overlayLabel}[${animLabel}]${overlayFilter}[${outLabel}]`,
     );
     overlayLabel = `[${outLabel}]`;
   });
@@ -227,9 +277,23 @@ export async function exportTimeline(
       const track = tracks.find((t) => t.id === clip.trackId);
       const trackVolume = track?.volume ?? 1;
       const combinedVolume = clip.volume * trackVolume;
+      const speed = clip.speed ?? 1;
+      const sourceDuration = clip.duration * speed;
 
-      // Build audio filter chain: trim → reset pts → delay → volume → fades
-      let chain = `[${clip.inputIdx}:a]atrim=start=${clip.mediaOffset}:duration=${clip.duration},asetpts=PTS-STARTPTS,adelay=${Math.round(clip.startTime * 1000)}|${Math.round(clip.startTime * 1000)},volume=${combinedVolume}`;
+      // Build audio filter chain: trim → reset pts → speed → delay → volume → fades
+      let chain = `[${clip.inputIdx}:a]atrim=start=${clip.mediaOffset}:duration=${sourceDuration},asetpts=PTS-STARTPTS`;
+
+      // Apply speed via atempo (supports 0.5-100, chain for values < 0.5)
+      if (speed !== 1) {
+        if (speed >= 0.5) {
+          chain += `,atempo=${speed}`;
+        } else {
+          // Chain two atempo filters for speeds below 0.5
+          chain += `,atempo=${Math.sqrt(speed)},atempo=${Math.sqrt(speed)}`;
+        }
+      }
+
+      chain += `,adelay=${Math.round(clip.startTime * 1000)}|${Math.round(clip.startTime * 1000)},volume=${combinedVolume}`;
 
       // Audio fade in
       if (clip.fadeIn > 0) {
@@ -259,8 +323,8 @@ export async function exportTimeline(
     }
   }
 
-  // Output settings
-  const quality = settings.quality === 'high' ? '18' : settings.quality === 'medium' ? '23' : '28';
+  // Output settings — quality maps: 4k=18, 1080p=20, 720p=26 (CRF)
+  const quality = settings.quality === '4k' ? '18' : settings.quality === '1080p' ? '20' : '26';
   const outputFile = settings.format === 'mp4' ? 'output.mp4' : 'output.webm';
 
   if (settings.format === 'mp4') {
@@ -275,7 +339,10 @@ export async function exportTimeline(
 
   onProgress(20);
 
-  await ff.exec(args);
+  const exitCode = await ff.exec(args);
+  if (exitCode !== 0) {
+    throw new Error(`FFmpeg exited with code ${exitCode}. Check browser console for details.`);
+  }
 
   onProgress(95);
 

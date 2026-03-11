@@ -1,8 +1,14 @@
 import { useState, useCallback } from 'react';
-import { X, Download, Loader2 } from 'lucide-react';
+import { X, Download, Loader2, AlertTriangle } from 'lucide-react';
 import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { exportTimeline, downloadBlob } from '../../services/export';
 import type { ExportSettings } from '../../types';
+
+const QUALITY_OPTIONS: { value: ExportSettings['quality']; label: string }[] = [
+  { value: '720p', label: '720p' },
+  { value: '1080p', label: '1080p' },
+  { value: '4k', label: '4K' },
+];
 
 export function ExportDialog() {
   const { showExportDialog, setShowExportDialog, isExporting, exportProgress, settings } =
@@ -11,15 +17,17 @@ export function ExportDialog() {
 
   const [exportSettings, setExportSettings] = useState<ExportSettings>({
     format: 'mp4',
-    quality: 'high',
+    quality: '1080p',
     includeAudio: true,
     burnCaptions: false,
   });
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const handleExport = useCallback(async () => {
     const state = storeApi.getState();
     state.setIsExporting(true);
     state.setExportProgress(0);
+    setExportError(null);
 
     try {
       const blob = await exportTimeline(state, exportSettings, (progress) => {
@@ -30,7 +38,8 @@ export function ExportDialog() {
       downloadBlob(blob, `cutlass-export.${ext}`);
     } catch (err) {
       console.error('Export failed:', err);
-      alert(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      const message = err instanceof Error ? err.message : String(err);
+      setExportError(message || 'Export failed. Check the browser console for details.');
     } finally {
       storeApi.getState().setIsExporting(false);
     }
@@ -82,17 +91,17 @@ export function ExportDialog() {
           <div>
             <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--text-secondary)' }}>Quality</label>
             <div className="flex gap-2">
-              {(['low', 'medium', 'high'] as const).map((q) => (
+              {QUALITY_OPTIONS.map(({ value, label }) => (
                 <button
-                  key={q}
-                  onClick={() => setExportSettings((s) => ({ ...s, quality: q }))}
-                  className="flex-1 px-3 py-1.5 rounded text-xs font-semibold capitalize"
+                  key={value}
+                  onClick={() => setExportSettings((s) => ({ ...s, quality: value }))}
+                  className="flex-1 px-3 py-1.5 rounded text-xs font-semibold"
                   style={{
-                    background: exportSettings.quality === q ? 'var(--accent)' : 'var(--bg-surface)',
-                    color: exportSettings.quality === q ? 'white' : 'var(--text-secondary)',
+                    background: exportSettings.quality === value ? 'var(--accent)' : 'var(--bg-surface)',
+                    color: exportSettings.quality === value ? 'white' : 'var(--text-secondary)',
                   }}
                 >
-                  {q}
+                  {label}
                 </button>
               ))}
             </div>
@@ -124,6 +133,14 @@ export function ExportDialog() {
               Burn captions into video
             </label>
           </div>
+
+          {/* Error display */}
+          {exportError && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded" style={{ background: 'rgba(239,68,68,0.15)' }}>
+              <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" color="#ef4444" />
+              <p className="text-xs" style={{ color: '#ef4444' }}>{exportError}</p>
+            </div>
+          )}
 
           {/* Progress */}
           {isExporting && (

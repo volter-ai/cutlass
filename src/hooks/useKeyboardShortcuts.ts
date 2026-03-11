@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useTimelineStore, useTimelineStoreApi } from '../store/timeline';
+import { saveProject, autoSaveLocal } from '../services/projects';
 
 export function useKeyboardShortcuts() {
   const store = useTimelineStore();
@@ -79,7 +80,16 @@ export function useKeyboardShortcuts() {
         case 's':
           if (isMeta) {
             e.preventDefault();
-            // Cmd+S: save project (handled by project persistence)
+            // Cmd+S: save project
+            if (store.currentProjectId) {
+              saveProject(store.currentProjectId, store.currentProjectName, store)
+                .then(() => store.markProjectSaved())
+                .catch(() => {});
+            } else {
+              // No project yet — just auto-save locally
+              autoSaveLocal(store);
+              store.markProjectSaved();
+            }
           } else {
             store.toggleSnap();
           }

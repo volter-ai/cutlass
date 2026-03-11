@@ -30,10 +30,41 @@ export interface TimelineClip {
   fadeOut: number;
   /** Links extracted audio clip to its source video clip */
   linkedGroupId?: string;
+  /** Playback speed multiplier (0.25-4, default 1) */
+  speed: number;
+  /** How the clip fits the canvas: fit (letterbox), fill (crop), stretch */
+  fitMode?: 'fit' | 'fill' | 'stretch';
+  /** Scale multiplier for the clip (default 1) */
+  scale?: number;
+  /** Horizontal position offset as percentage (-100 to 100, default 0) */
+  positionX?: number;
+  /** Vertical position offset as percentage (-100 to 100, default 0) */
+  positionY?: number;
+  /** Animation preset applied to this clip */
+  animation?: ClipAnimation;
   /** Transition applied to the start of this clip */
   transitionIn?: Transition;
   /** Transition applied to the end of this clip */
   transitionOut?: Transition;
+}
+
+export type AnimationPreset =
+  | 'none'
+  | 'fade-in'
+  | 'fade-out'
+  | 'fade-in-out'
+  | 'slide-left'
+  | 'slide-right'
+  | 'slide-up'
+  | 'slide-down'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'ken-burns';
+
+export interface ClipAnimation {
+  preset: AnimationPreset;
+  /** Duration of the animation effect in seconds (default: full clip) */
+  duration?: number;
 }
 
 export interface Transition {
@@ -141,7 +172,7 @@ export type FillerRemovalMode = 'delete' | 'gap' | 'ignore' | 'transcript-only';
 
 export interface ExportSettings {
   format: 'mp4' | 'webm';
-  quality: 'low' | 'medium' | 'high';
+  quality: '720p' | '1080p' | '4k';
   includeAudio: boolean;
   burnCaptions: boolean;
 }

@@ -70,6 +70,8 @@ export type {
   Tool,
   FillerRemovalMode,
   Transition,
+  ClipAnimation,
+  AnimationPreset,
   TextOverlay,
   TextStyle,
   CaptionStyle,

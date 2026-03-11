@@ -12,6 +12,8 @@ import {
   saveProject,
   deserializeProject,
 } from '../../services/projects';
+import { getMediaFile } from '../../services/mediaStorage';
+import { createMediaFile } from '../../utils/media';
 import type { Project } from '../../types';
 
 export function ProjectsModal() {
@@ -28,21 +30,24 @@ export function ProjectsModal() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
+  // Can create/list projects either with Supabase+auth OR with localStorage
+  const canManageProjects = (isSupabaseConfigured() && !!user) || !isSupabaseConfigured();
+
   const fetchProjects = useCallback(async () => {
-    if (!user || !isSupabaseConfigured()) return;
+    if (!canManageProjects) return;
     setLoading(true);
     try {
       const list = await listProjects();
       setProjects(list);
     } catch {
-      // Silently fail — projects list just stays empty
+      // Silently fail
     }
     setLoading(false);
-  }, [user]);
+  }, [canManageProjects]);
 
   useEffect(() => {
-    if (show && user) fetchProjects();
-  }, [show, user, fetchProjects]);
+    if (show) fetchProjects();
+  }, [show, fetchProjects]);
 
   useEffect(() => {
     if (!show) return;
@@ -63,7 +68,6 @@ export function ProjectsModal() {
   if (!show) return null;
 
   const handleNew = async () => {
-    if (!user) return;
     // Save current project first if it exists
     if (store.currentProjectId) {
       try {
@@ -85,12 +89,10 @@ export function ProjectsModal() {
     try {
       const { timelineData } = await loadProject(project.id);
       const deserialized = deserializeProject(timelineData, store.mediaFiles);
-
-      // Hydrate store with loaded project data
       const currentState = storeApi.getState();
 
       storeApi.setState({
-        tracks: deserialized.tracks,
+        tracks: deserialized.tracks.length > 0 ? deserialized.tracks : currentState.tracks,
         clips: deserialized.clips,
         textOverlays: deserialized.textOverlays,
         transcripts: deserialized.transcripts,
@@ -101,6 +103,18 @@ export function ProjectsModal() {
         playheadPosition: 0,
         isPlaying: false,
       });
+
+      // Try to recover media from IndexedDB
+      const mediaNameMap = deserialized.mediaNameMap;
+      for (const [mediaId] of Object.entries(mediaNameMap)) {
+        if (storeApi.getState().mediaFiles[mediaId]) continue;
+        getMediaFile(mediaId).then(async (file) => {
+          if (!file) return;
+          const mf = await createMediaFile(file);
+          mf.id = mediaId;
+          storeApi.getState().addMediaFile(mf);
+        }).catch(() => {});
+      }
 
       setShow(false);
     } catch {
@@ -148,9 +162,14 @@ export function ProjectsModal() {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
-          <h2 className="text-sm font-bold">Projects</h2>
+          <div>
+            <h2 className="text-sm font-bold">Projects</h2>
+            {!isSupabaseConfigured() && (
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Saved locally in this browser</p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
-            {user && (
+            {canManageProjects && (
               <button
                 onClick={handleNew}
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold"
@@ -168,7 +187,7 @@ export function ProjectsModal() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          {!user ? (
+          {!canManageProjects ? (
             <div className="p-8 text-center">
               <FolderOpen size={32} className="mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
               <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -182,8 +201,11 @@ export function ProjectsModal() {
           ) : projects.length === 0 ? (
             <div className="p-8 text-center">
               <FolderOpen size={32} className="mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>
                 No projects yet. Click "New" to create one.
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
+                Your current session auto-saves every few seconds.
               </p>
             </div>
           ) : (

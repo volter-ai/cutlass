@@ -1,7 +1,71 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { Maximize2 } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
-import type { TimelineClip } from '../../types';
+import type { TimelineClip, AnimationPreset } from '../../types';
+
+/** Compute CSS transform + opacity for a clip animation at a given progress (0-1 through clip) */
+function getAnimationStyle(
+  preset: AnimationPreset | undefined,
+  progress: number,
+): { transform: string; opacity: number } {
+  if (!preset || preset === 'none') return { transform: '', opacity: 1 };
+
+  // Easing function (ease-in-out)
+  const ease = (t: number) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+
+  switch (preset) {
+    case 'fade-in': {
+      const t = Math.min(1, progress * 3); // fade in over first third
+      return { transform: '', opacity: ease(t) };
+    }
+    case 'fade-out': {
+      const t = Math.max(0, (progress - 0.67) * 3); // fade out over last third
+      return { transform: '', opacity: 1 - ease(t) };
+    }
+    case 'fade-in-out': {
+      const fadeIn = Math.min(1, progress * 4);
+      const fadeOut = Math.max(0, (progress - 0.75) * 4);
+      return { transform: '', opacity: ease(fadeIn) * (1 - ease(fadeOut)) };
+    }
+    case 'slide-left': {
+      const t = Math.min(1, progress * 3);
+      const x = (1 - ease(t)) * 100;
+      return { transform: `translateX(${x}%)`, opacity: 1 };
+    }
+    case 'slide-right': {
+      const t = Math.min(1, progress * 3);
+      const x = (1 - ease(t)) * -100;
+      return { transform: `translateX(${x}%)`, opacity: 1 };
+    }
+    case 'slide-up': {
+      const t = Math.min(1, progress * 3);
+      const y = (1 - ease(t)) * 100;
+      return { transform: `translateY(${y}%)`, opacity: 1 };
+    }
+    case 'slide-down': {
+      const t = Math.min(1, progress * 3);
+      const y = (1 - ease(t)) * -100;
+      return { transform: `translateY(${y}%)`, opacity: 1 };
+    }
+    case 'zoom-in': {
+      const scale = 1 + progress * 0.3; // 1.0 → 1.3
+      return { transform: `scale(${scale})`, opacity: 1 };
+    }
+    case 'zoom-out': {
+      const scale = 1.3 - progress * 0.3; // 1.3 → 1.0
+      return { transform: `scale(${scale})`, opacity: 1 };
+    }
+    case 'ken-burns': {
+      // Slow zoom in + subtle pan
+      const scale = 1 + progress * 0.2;
+      const x = progress * 5;
+      const y = progress * -3;
+      return { transform: `scale(${scale}) translate(${x}%, ${y}%)`, opacity: 1 };
+    }
+    default:
+      return { transform: '', opacity: 1 };
+  }
+}
 
 export function Viewer() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -32,6 +96,13 @@ export function Viewer() {
 
   const activeMedia = activeClip ? mediaFiles[activeClip.mediaFileId] : null;
 
+  // Compute animation progress and style
+  const animStyle = useMemo(() => {
+    if (!activeClip) return { transform: '', opacity: 1 };
+    const progress = (playheadPosition - activeClip.startTime) / activeClip.duration;
+    return getAnimationStyle(activeClip.animation?.preset, Math.max(0, Math.min(1, progress)));
+  }, [activeClip, playheadPosition]);
+
   // Sync video element with playhead
   useEffect(() => {
     const video = videoRef.current;
@@ -41,7 +112,13 @@ export function Viewer() {
       video.src = activeMedia.url;
     }
 
-    const mediaTime = activeClip.mediaOffset + (playheadPosition - activeClip.startTime);
+    const speed = activeClip.speed ?? 1;
+    const mediaTime = activeClip.mediaOffset + (playheadPosition - activeClip.startTime) * speed;
+
+    // Set playback rate to match clip speed
+    if (video.playbackRate !== speed) {
+      video.playbackRate = speed;
+    }
 
     if (!isPlaying) {
       video.pause();
@@ -69,6 +146,12 @@ export function Viewer() {
   const handleFullscreen = useCallback(() => {
     containerRef.current?.requestFullscreen?.();
   }, []);
+
+  // Build combined transform: base (scale/position) + animation
+  const baseTransform = activeClip
+    ? `scale(${activeClip.scale ?? 1}) translate(${activeClip.positionX ?? 0}%, ${activeClip.positionY ?? 0}%)`
+    : '';
+  const combinedTransform = [baseTransform, animStyle.transform].filter(Boolean).join(' ');
 
   return (
     <div
@@ -98,7 +181,14 @@ export function Viewer() {
         {activeMedia ? (
           <video
             ref={videoRef}
-            className="max-w-full max-h-full object-contain"
+            className="max-w-full max-h-full"
+            style={{
+              objectFit: activeClip?.fitMode === 'fill' ? 'cover'
+                : activeClip?.fitMode === 'stretch' ? 'fill'
+                : 'contain',
+              transform: combinedTransform || undefined,
+              opacity: animStyle.opacity,
+            }}
             muted
             playsInline
           />
