@@ -13,7 +13,7 @@ export function TextOverlayClip({ overlay }: Props) {
 
   const clipRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef({ x: 0, startTime: 0 });
+  const dragStartRef = useRef({ x: 0, startTime: 0, duration: 0 });
 
   const isSelected = selectedTextOverlayId === overlay.id;
   const left = overlay.startTime * zoom;
@@ -24,17 +24,17 @@ export function TextOverlayClip({ overlay }: Props) {
       e.stopPropagation();
       selectTextOverlay(overlay.id);
       setIsDragging(true);
-      dragStartRef.current = { x: e.clientX, startTime: overlay.startTime };
+      dragStartRef.current = { x: e.clientX, startTime: overlay.startTime, duration: overlay.duration };
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
+        // delta is always computed from the drag-start position (not incremental)
         const delta = (moveEvent.clientX - dragStartRef.current.x) / zoom;
         if (type === 'move') {
           updateTextOverlay(overlay.id, { startTime: Math.max(0, dragStartRef.current.startTime + delta) });
         } else {
-          const newDuration = overlay.duration + delta;
+          const newDuration = dragStartRef.current.duration + delta;
           if (newDuration > 0.5) {
             updateTextOverlay(overlay.id, { duration: newDuration });
-            dragStartRef.current.x = moveEvent.clientX;
           }
         }
       };

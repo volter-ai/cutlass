@@ -72,8 +72,8 @@ function generateThumbnail(url: string): Promise<string> {
     const video = document.createElement('video');
     video.preload = 'auto';
     video.muted = true;
-    video.currentTime = 1; // grab frame at 1s
-    video.oncanplay = () => {
+
+    const drawFrame = () => {
       const canvas = document.createElement('canvas');
       canvas.width = 160;
       canvas.height = 90;
@@ -85,6 +85,18 @@ function generateThumbnail(url: string): Promise<string> {
         resolve('');
       }
     };
+
+    // After metadata loads, seek to 1s (or 10% for short clips); draw after seek
+    video.oncanplay = () => {
+      const seekTo = video.duration > 1 ? 1 : video.duration * 0.1;
+      if (seekTo > 0) {
+        video.currentTime = seekTo;
+      } else {
+        drawFrame();
+      }
+    };
+
+    video.onseeked = drawFrame;
     video.onerror = () => resolve('');
     video.src = url;
   });

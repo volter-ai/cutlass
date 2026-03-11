@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
-import { useTimelineStore, useTimelineStoreApi } from '../store/timeline';
+import { useTimelineStoreApi } from '../store/timeline';
 import { saveProject, autoSaveLocal } from '../services/projects';
 
 export function useKeyboardShortcuts() {
-  const store = useTimelineStore();
   const storeApi = useTimelineStoreApi();
 
   useEffect(() => {
@@ -16,6 +15,10 @@ export function useKeyboardShortcuts() {
         return;
       }
 
+      // Read fresh state on each keypress — avoids stale closures and
+      // prevents the effect from re-running (and re-registering the listener)
+      // on every store state change.
+      const store = storeApi.getState();
       const isMeta = e.metaKey || e.ctrlKey;
 
       switch (e.key) {
@@ -153,5 +156,5 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [store, storeApi]);
+  }, [storeApi]); // storeApi is stable — listener registers exactly once
 }

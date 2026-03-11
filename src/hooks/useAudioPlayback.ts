@@ -109,11 +109,18 @@ export function useAudioPlayback() {
 
       const audioElement = source.element;
 
+      const speed = clip.speed ?? 1;
+
       // Compute final volume: clip volume * fade envelope * track master
       const fadeMultiplier = computeFadeMultiplier(clip, playheadPosition);
       audioElement.volume = Math.min(1, clip.volume * fadeMultiplier * trackVolume);
 
-      const mediaTime = clip.mediaOffset + (playheadPosition - clipStart);
+      // Match playback rate to clip speed
+      if (audioElement.playbackRate !== speed) {
+        audioElement.playbackRate = speed;
+      }
+
+      const mediaTime = clip.mediaOffset + (playheadPosition - clipStart) * speed;
 
       if (isPlaying) {
         if (Math.abs(audioElement.currentTime - mediaTime) > 0.15) {

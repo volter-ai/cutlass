@@ -256,6 +256,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             }
             state.selectedClipIds = state.selectedClipIds.filter((clipId) => !!state.clips[clipId]);
           });
+          get().recalculateDuration();
           // Remove from IndexedDB (fire-and-forget)
           import('../services/mediaStorage').then((ms) =>
             ms.removeMediaFile(id).catch(() => {}),
@@ -343,6 +344,8 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             clip.mediaOffset += delta;
             clip.duration -= delta;
             clip.startTime = newStartTime;
+            // Clamp fade-in so it never exceeds half the new duration
+            clip.fadeIn = Math.min(clip.fadeIn, clip.duration / 2);
           }),
 
         trimClipEnd: (clipId, newEndTime) =>
@@ -350,6 +353,8 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             const clip = state.clips[clipId];
             if (!clip) return;
             clip.duration = newEndTime - clip.startTime;
+            // Clamp fade-out so it never exceeds half the new duration
+            clip.fadeOut = Math.min(clip.fadeOut, clip.duration / 2);
           }),
 
         splitClipAtPlayhead: (clipId) =>
