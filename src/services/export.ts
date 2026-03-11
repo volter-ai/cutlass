@@ -66,6 +66,16 @@ export async function exportTimeline(
     inputFiles.push(filename);
   }
 
+  // Build set of linkedGroupIds that have a dedicated audio clip on an audio track,
+  // so the paired video clip doesn't produce double audio (mirrors useAudioPlayback logic).
+  const linkedGroupsWithAudio = new Set<string>();
+  for (const clip of Object.values(clips)) {
+    const track = tracks.find((t) => t.id === clip.trackId);
+    if (track?.type === 'audio' && clip.linkedGroupId) {
+      linkedGroupsWithAudio.add(clip.linkedGroupId);
+    }
+  }
+
   // Categorize clips
   for (const clip of Object.values(clips)) {
     const track = tracks.find((t) => t.id === clip.trackId);
@@ -75,8 +85,8 @@ export async function exportTimeline(
 
     if (track.type === 'video') {
       videoClips.push({ ...clip, inputIdx });
-      // Video clips also contribute audio if on a video track
-      if (settings.includeAudio) {
+      // Video clips contribute audio unless their audio has been extracted to a linked clip
+      if (settings.includeAudio && !(clip.linkedGroupId && linkedGroupsWithAudio.has(clip.linkedGroupId))) {
         audioClips.push({ ...clip, inputIdx });
       }
     } else if (track.type === 'audio' && settings.includeAudio) {
@@ -219,6 +229,7 @@ export async function exportTimeline(
   // Auto-captions from transcript
   if (settings.burnCaptions) {
     const captionStyle = state.settings.captionStyle;
+    let captionIdx = 0; // global counter — guarantees unique FFmpeg filter labels
     Object.values(transcripts).forEach((transcript) => {
       transcript.segments.forEach((segment) => {
         const visibleWords = segment.words.filter((w) => !w.isRemoved);
@@ -237,10 +248,12 @@ export async function exportTimeline(
             : '(h-th)/2';
 
           const escapedText = text.replace(/'/g, "\\'").replace(/:/g, '\\:');
+          const capLabel = `cap${captionIdx}`;
           filterParts.push(
-            `${overlayLabel}drawtext=text='${escapedText}':fontsize=${captionStyle.fontSize}:fontcolor=${captionStyle.color}:x=(w-tw)/2:y=${yPos}:enable='between(t,${start},${end})':box=1:boxcolor=${captionStyle.backgroundColor.replace(/,/g, '\\,')}:boxborderw=8[cap${i}_${segment.id.slice(0, 4)}]`,
+            `${overlayLabel}drawtext=text='${escapedText}':fontsize=${captionStyle.fontSize}:fontcolor=${captionStyle.color}:x=(w-tw)/2:y=${yPos}:enable='between(t,${start},${end})':box=1:boxcolor=${captionStyle.backgroundColor.replace(/,/g, '\\,')}:boxborderw=8[${capLabel}]`,
           );
-          overlayLabel = `[cap${i}_${segment.id.slice(0, 4)}]`;
+          overlayLabel = `[${capLabel}]`;
+          captionIdx++;
         }
       });
     });

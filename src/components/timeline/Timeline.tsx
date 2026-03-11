@@ -37,7 +37,10 @@ export function Timeline() {
   const [marquee, setMarquee] = useState<MarqueeRect | null>(null);
   const marqueeRef = useRef<MarqueeRect | null>(null);
 
-  // Compute track Y positions for marquee intersection
+  // Compute track Y positions for marquee intersection.
+  // Depends on `tracks` (stable reference from the store) rather than the
+  // filtered arrays above, which are new references every render and would
+  // defeat the memo.
   const trackPositions = useMemo(() => {
     const positions: Record<string, { top: number; height: number }> = {};
     let y = RULER_HEIGHT;
@@ -61,7 +64,7 @@ export function Timeline() {
     });
 
     return positions;
-  }, [videoTracks, audioTracks, textTracks]);
+  }, [tracks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get clips within marquee bounds
   const getClipsInMarquee = useCallback(

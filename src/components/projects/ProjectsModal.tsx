@@ -104,6 +104,7 @@ export function ProjectsModal() {
         playheadPosition: 0,
         isPlaying: false,
       });
+      storeApi.getState().recalculateDuration();
 
       // Try to recover media from IndexedDB
       const mediaNameMap = deserialized.mediaNameMap;

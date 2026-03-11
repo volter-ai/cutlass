@@ -27,9 +27,6 @@ export async function transcribeMedia(media: MediaFile, apiKey?: string): Promis
 }
 
 async function transcribeWithDeepgram(media: MediaFile, apiKey: string): Promise<Transcript> {
-  const formData = new FormData();
-  formData.append('audio', media.file);
-
   const response = await fetch(
     'https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&utterances=true&diarize=true',
     {
