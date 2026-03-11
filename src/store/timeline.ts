@@ -406,6 +406,17 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             // Adjust duration to keep the same source media range
             clip.duration = clip.duration * (clip.speed / clampedSpeed);
             clip.speed = clampedSpeed;
+
+            // Sync linked clip (e.g. extracted audio)
+            if (clip.linkedGroupId) {
+              const linked = Object.values(state.clips).find(
+                (c) => c.id !== clipId && c.linkedGroupId === clip.linkedGroupId,
+              );
+              if (linked) {
+                linked.duration = linked.duration * (linked.speed / clampedSpeed);
+                linked.speed = clampedSpeed;
+              }
+            }
           }),
 
         setClipFitMode: (clipId, fitMode) =>
