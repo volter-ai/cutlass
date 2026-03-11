@@ -80,6 +80,7 @@ export const en = {
     transitionIn: 'Transition In',
     transitionOut: 'Transition Out',
     volume: 'Volume',
+    editText: 'Edit Text',
     deleteClip: 'Delete Clip',
     none: 'None',
     normal: '1x (Normal)',

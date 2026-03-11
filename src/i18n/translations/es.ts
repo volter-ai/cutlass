@@ -82,6 +82,7 @@ export const es: Translations = {
     transitionIn: 'Transici\u00f3n de entrada',
     transitionOut: 'Transici\u00f3n de salida',
     volume: 'Volumen',
+    editText: 'Editar texto',
     deleteClip: 'Eliminar clip',
     none: 'Ninguno',
     normal: '1x (Normal)',

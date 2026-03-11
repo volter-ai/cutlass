@@ -53,6 +53,9 @@ export function useKeyboardShortcuts() {
               store.selectedClipIds.forEach((id) => store.removeClip(id));
             }
             store.recalculateDuration();
+          } else if (store.selectedTextOverlayId) {
+            e.preventDefault();
+            store.removeTextOverlay(store.selectedTextOverlayId);
           }
           break;
 

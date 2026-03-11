@@ -1,5 +1,6 @@
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
+import { useLanguage } from '../../context/LanguageProvider';
 import type { TextOverlay } from '../../types';
 
 interface Props {
@@ -9,11 +10,16 @@ interface Props {
 export function TextOverlayClip({ overlay }: Props) {
   const zoom = useTimelineStore((s) => s.zoom);
   const selectedTextOverlayId = useTimelineStore((s) => s.selectedTextOverlayId);
-  const { selectTextOverlay, updateTextOverlay } = useTimelineStore();
+  const { selectTextOverlay, updateTextOverlay, removeTextOverlay } = useTimelineStore();
   const storeApi = useTimelineStoreApi();
+  const { t } = useLanguage();
 
   const clipRef = useRef<HTMLDivElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState('');
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const dragStartRef = useRef({ x: 0, startTime: 0, duration: 0 });
 
   const isSelected = selectedTextOverlayId === overlay.id;
@@ -79,11 +85,36 @@ export function TextOverlayClip({ overlay }: Props) {
   );
 
   const handleDoubleClick = useCallback(() => {
-    const newText = prompt('Edit text:', overlay.text);
-    if (newText !== null) {
-      updateTextOverlay(overlay.id, { text: newText });
+    setEditText(overlay.text);
+    setIsEditing(true);
+  }, [overlay.text]);
+
+  const commitEdit = useCallback(() => {
+    if (editText.trim()) {
+      updateTextOverlay(overlay.id, { text: editText.trim() });
     }
-  }, [overlay, updateTextOverlay]);
+    setIsEditing(false);
+  }, [editText, overlay.id, updateTextOverlay]);
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditing && editInputRef.current) editInputRef.current.focus();
+  }, [isEditing]);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    selectTextOverlay(overlay.id);
+    setContextMenuPos({ x: e.clientX, y: e.clientY });
+  }, [overlay.id, selectTextOverlay]);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    if (!contextMenuPos) return;
+    const handle = () => setContextMenuPos(null);
+    window.addEventListener('mousedown', handle);
+    return () => window.removeEventListener('mousedown', handle);
+  }, [contextMenuPos]);
 
   return (
     <div
@@ -102,12 +133,29 @@ export function TextOverlayClip({ overlay }: Props) {
       }}
       onMouseDown={(e) => handleMouseDown(e, 'move')}
       onDoubleClick={handleDoubleClick}
+      onContextMenu={handleContextMenu}
     >
-      {/* Text content */}
+      {/* Text content or inline edit */}
       <div className="flex-1 h-full flex items-center px-2 overflow-hidden">
-        <span className="text-xs text-black truncate font-semibold">
-          {overlay.text}
-        </span>
+        {isEditing ? (
+          <input
+            ref={editInputRef}
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
+              if (e.key === 'Escape') setIsEditing(false);
+              e.stopPropagation();
+            }}
+            onBlur={commitEdit}
+            className="text-xs font-semibold w-full bg-transparent outline-none"
+            style={{ color: 'black' }}
+          />
+        ) : (
+          <span className="text-xs text-black truncate font-semibold">
+            {overlay.text}
+          </span>
+        )}
       </div>
 
       {/* Trim handle right */}
@@ -119,6 +167,36 @@ export function TextOverlayClip({ overlay }: Props) {
           handleMouseDown(e, 'trim-end');
         }}
       />
+
+      {/* Context menu */}
+      {contextMenuPos && (
+        <div
+          className="fixed z-50 rounded shadow-lg py-1"
+          style={{
+            left: contextMenuPos.x,
+            top: contextMenuPos.y,
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            minWidth: 120,
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full text-left px-3 py-1 text-xs hover:opacity-80"
+            style={{ color: 'var(--text-primary)' }}
+            onClick={() => { setContextMenuPos(null); handleDoubleClick(); }}
+          >
+            {t.contextMenu.editText ?? 'Edit Text'}
+          </button>
+          <button
+            className="w-full text-left px-3 py-1 text-xs hover:opacity-80"
+            style={{ color: '#ef4444' }}
+            onClick={() => { setContextMenuPos(null); removeTextOverlay(overlay.id); }}
+          >
+            {t.contextMenu.deleteClip}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
