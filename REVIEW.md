@@ -60,6 +60,21 @@ GitHub issues: #10, #11, #12, #13
 
 ---
 
+## Valentin tester feedback — fixes (2026-03-11)
+
+| Issue | Fix / Status |
+|-------|-------------|
+| Image overlays | `TimelineClip.type` extended to `'video'\|'audio'\|'image'`; `addClipToTrack` sets type `'image'` and defaults to 5s duration; `Viewer.tsx` renders active image clips as `<img>` overlays with full animation/fade/transform support |
+| Text entry/exit animations | `TextOverlay` gains `fadeIn?` and `fadeOut?` fields; Viewer computes per-overlay opacity fade; Settings panel shows Fade In / Fade Out sliders when a text overlay is selected |
+| Text fonts/styles | Already fully implemented — font, size, weight, color, background, outline, position, align in Settings panel when overlay selected |
+| Sound effects library | Filed as #16 — significant new feature |
+| Performance optimization | Filed as #17 — needs profiling |
+| Slide transitions in export | Already exist as clip animation presets in the Viewer; FFmpeg export not yet supported (REVIEW.md known limitation), filed as #17 |
+
+GitHub issues: #14, #15, #16, #17
+
+---
+
 ## No open actionable issues
 
 After three review passes the following have all been addressed:

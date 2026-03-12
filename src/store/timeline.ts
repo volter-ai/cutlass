@@ -117,7 +117,7 @@ export interface TimelineState {
 
   // Actions - Text Overlays
   addTextOverlay: (trackId: string, startTime: number, text: string) => string;
-  updateTextOverlay: (id: string, updates: Partial<Pick<TextOverlay, 'text' | 'startTime' | 'duration'>> & { style?: Partial<TextOverlay['style']> }) => void;
+  updateTextOverlay: (id: string, updates: Partial<Pick<TextOverlay, 'text' | 'startTime' | 'duration' | 'fadeIn' | 'fadeOut'>> & { style?: Partial<TextOverlay['style']> }) => void;
   removeTextOverlay: (id: string) => void;
   selectTextOverlay: (id: string | null) => void;
 
@@ -268,7 +268,13 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           const mediaFile = get().mediaFiles[mediaFileId];
           if (!mediaFile) return clipId;
 
-          const clipDuration = duration ?? mediaFile.duration - mediaOffset;
+          // Images have no natural duration — default to 5 seconds
+          const naturalDuration = mediaFile.type === 'image' ? 5 : mediaFile.duration - mediaOffset;
+          const clipDuration = duration ?? naturalDuration;
+          const clipType = mediaFile.type === 'audio' ? 'audio'
+            : mediaFile.type === 'image' ? 'image'
+            : 'video';
+
           set((state) => {
             state.clips[clipId] = {
               id: clipId,
@@ -278,7 +284,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
               duration: clipDuration,
               mediaOffset,
               name: mediaFile.name,
-              type: mediaFile.type === 'audio' ? 'audio' : 'video',
+              type: clipType,
               volume: 1,
               speed: 1,
               fadeIn: 0,
@@ -585,6 +591,8 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             if (updates.text !== undefined) overlay.text = updates.text;
             if (updates.startTime !== undefined) overlay.startTime = updates.startTime;
             if (updates.duration !== undefined) overlay.duration = updates.duration;
+            if (updates.fadeIn !== undefined) overlay.fadeIn = updates.fadeIn;
+            if (updates.fadeOut !== undefined) overlay.fadeOut = updates.fadeOut;
             if (updates.style) Object.assign(overlay.style, updates.style);
           }),
 

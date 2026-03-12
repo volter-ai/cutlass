@@ -108,7 +108,7 @@ export function Viewer() {
     return () => ro.disconnect();
   }, []);
 
-  // Find the active video clip at the current playhead position
+  // Find the active video clip at the current playhead position (video type only)
   const activeClip = useMemo(() => {
     const videoTrackIds = new Set(
       tracks.filter((t) => t.type === 'video').map((t) => t.id),
@@ -116,12 +116,23 @@ export function Viewer() {
     return (
       Object.values(clips).find(
         (c) =>
+          c.type === 'video' &&
           videoTrackIds.has(c.trackId) &&
           playheadPosition >= c.startTime &&
           playheadPosition < c.startTime + c.duration,
       ) ?? null
     );
   }, [tracks, clips, playheadPosition]);
+
+  // Image clips active at the current playhead (rendered as overlays on top of video)
+  const activeImageClips = useMemo(() => {
+    return Object.values(clips).filter(
+      (c) =>
+        c.type === 'image' &&
+        playheadPosition >= c.startTime &&
+        playheadPosition < c.startTime + c.duration,
+    );
+  }, [clips, playheadPosition]);
 
   const activeMedia = activeClip ? mediaFiles[activeClip.mediaFileId] : null;
 
@@ -269,33 +280,74 @@ export function Viewer() {
             </div>
           )}
 
+          {/* Image overlays */}
+          {activeImageClips.map((clip) => {
+            const imgMedia = mediaFiles[clip.mediaFileId];
+            if (!imgMedia) return null;
+            const imgProgress = (playheadPosition - clip.startTime) / clip.duration;
+            const imgAnim = getAnimationStyle(clip.animation?.preset, Math.max(0, Math.min(1, imgProgress)));
+            const imgFade = computeVideoFadeMultiplier(clip, playheadPosition);
+            const imgBaseTransform = `scale(${clip.scale ?? 1}) translate(${clip.positionX ?? 0}%, ${clip.positionY ?? 0}%)`;
+            const imgTransform = [imgBaseTransform, imgAnim.transform].filter(Boolean).join(' ');
+            return (
+              <img
+                key={clip.id}
+                src={imgMedia.url}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: clip.fitMode === 'fill' ? 'cover' : clip.fitMode === 'stretch' ? 'fill' : 'contain',
+                  transform: imgTransform || undefined,
+                  opacity: imgAnim.opacity * imgFade,
+                  pointerEvents: 'none',
+                  zIndex: 5,
+                }}
+              />
+            );
+          })}
+
           {/* Text overlays */}
-          {activeTextOverlays.map((overlay) => (
-            <div
-              key={overlay.id}
-              style={{
-                position: 'absolute',
-                left: `${overlay.style.x}%`,
-                top: `${overlay.style.y}%`,
-                transform: 'translate(-50%, -50%)',
-                fontFamily: overlay.style.fontFamily,
-                fontSize: Math.round(overlay.style.fontSize * fontScale),
-                fontWeight: overlay.style.fontWeight,
-                color: overlay.style.color,
-                textAlign: overlay.style.textAlign,
-                backgroundColor: overlay.style.backgroundColor !== 'transparent' ? overlay.style.backgroundColor : undefined,
-                padding: overlay.style.backgroundColor !== 'transparent' ? '4px 8px' : undefined,
-                textShadow: overlay.style.outline
-                  ? `-1px -1px 0 ${overlay.style.outlineColor}, 1px -1px 0 ${overlay.style.outlineColor}, -1px 1px 0 ${overlay.style.outlineColor}, 1px 1px 0 ${overlay.style.outlineColor}`
-                  : undefined,
-                pointerEvents: 'none',
-                whiteSpace: 'nowrap',
-                zIndex: 10,
-              }}
-            >
-              {overlay.text}
-            </div>
-          ))}
+          {activeTextOverlays.map((overlay) => {
+            // Compute fade opacity for this overlay
+            const elapsed = playheadPosition - overlay.startTime;
+            const remaining = overlay.startTime + overlay.duration - playheadPosition;
+            let textOpacity = 1;
+            if (overlay.fadeIn && overlay.fadeIn > 0 && elapsed < overlay.fadeIn) {
+              textOpacity = Math.max(0, elapsed / overlay.fadeIn);
+            }
+            if (overlay.fadeOut && overlay.fadeOut > 0 && remaining < overlay.fadeOut) {
+              textOpacity = Math.min(textOpacity, Math.max(0, remaining / overlay.fadeOut));
+            }
+            return (
+              <div
+                key={overlay.id}
+                style={{
+                  position: 'absolute',
+                  left: `${overlay.style.x}%`,
+                  top: `${overlay.style.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                  fontFamily: overlay.style.fontFamily,
+                  fontSize: Math.round(overlay.style.fontSize * fontScale),
+                  fontWeight: overlay.style.fontWeight,
+                  color: overlay.style.color,
+                  textAlign: overlay.style.textAlign,
+                  backgroundColor: overlay.style.backgroundColor !== 'transparent' ? overlay.style.backgroundColor : undefined,
+                  padding: overlay.style.backgroundColor !== 'transparent' ? '4px 8px' : undefined,
+                  textShadow: overlay.style.outline
+                    ? `-1px -1px 0 ${overlay.style.outlineColor}, 1px -1px 0 ${overlay.style.outlineColor}, -1px 1px 0 ${overlay.style.outlineColor}, 1px 1px 0 ${overlay.style.outlineColor}`
+                    : undefined,
+                  opacity: textOpacity,
+                  pointerEvents: 'none',
+                  whiteSpace: 'nowrap',
+                  zIndex: 10,
+                }}
+              >
+                {overlay.text}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

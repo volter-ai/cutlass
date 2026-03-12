@@ -21,7 +21,7 @@ export interface TimelineClip {
   /** Offset into the source media (seconds) */
   mediaOffset: number;
   name: string;
-  type: 'video' | 'audio';
+  type: 'video' | 'audio' | 'image';
   /** Volume level 0-2 */
   volume: number;
   /** Audio fade in duration (seconds) */
@@ -90,6 +90,10 @@ export interface TextOverlay {
   duration: number;
   text: string;
   style: TextStyle;
+  /** Fade-in duration in seconds */
+  fadeIn?: number;
+  /** Fade-out duration in seconds */
+  fadeOut?: number;
 }
 
 export interface TextStyle {

@@ -407,6 +407,38 @@ export function SettingsPanel() {
                 </div>
               )}
             </div>
+
+            {/* Fade In / Fade Out */}
+            <div className="mb-2 grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                  Fade In: {(selectedOverlay.fadeIn ?? 0).toFixed(1)}s
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.min(2, selectedOverlay.duration / 2)}
+                  step={0.1}
+                  value={selectedOverlay.fadeIn ?? 0}
+                  onChange={(e) => updateTextOverlay(selectedTextOverlayId!, { fadeIn: Number(e.target.value) })}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                  Fade Out: {(selectedOverlay.fadeOut ?? 0).toFixed(1)}s
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.min(2, selectedOverlay.duration / 2)}
+                  step={0.1}
+                  value={selectedOverlay.fadeOut ?? 0}
+                  onChange={(e) => updateTextOverlay(selectedTextOverlayId!, { fadeOut: Number(e.target.value) })}
+                  className="w-full"
+                />
+              </div>
+            </div>
           </section>
         )}
       </div>
