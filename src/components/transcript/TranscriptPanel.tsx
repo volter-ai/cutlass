@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   FileText,
   Loader2,
@@ -6,6 +6,7 @@ import {
   Wand2,
   Layers,
   MessageSquarePlus,
+  CheckCircle,
 } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { transcribeMedia } from '../../services/transcription';
@@ -30,11 +31,21 @@ export function TranscriptPanel() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   const [fillerMode, setFillerMode] = useState<FillerRemovalMode>('delete');
+  const [captionsJustAdded, setCaptionsJustAdded] = useState(false);
+  const captionsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const mediaList = Object.values(mediaFiles).filter((m) => m.type === 'video' || m.type === 'audio');
   const activeTranscript = activeTranscriptMediaId
     ? transcripts[activeTranscriptMediaId]
     : null;
+
+  // Auto-select the first media file when the panel mounts with no selection
+  useEffect(() => {
+    if (!activeTranscriptMediaId && mediaList.length > 0) {
+      setActiveTranscriptMediaId(mediaList[0].id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleTranscribe = useCallback(
     async (mediaFileId: string) => {
@@ -52,12 +63,21 @@ export function TranscriptPanel() {
         setActiveTranscriptMediaId(mediaFileId);
       } catch (err) {
         console.error('Transcription failed:', err);
-        setTranscriptionError(err instanceof Error ? err.message : 'Transcription failed');
+        const msg = err instanceof Error ? err.message : 'Transcription failed';
+        let displayMsg = msg;
+        if (msg.includes('401') || msg.includes('403')) {
+          displayMsg = `${msg} — your API key may be invalid. Check Settings.`;
+        } else if (msg.includes('429')) {
+          displayMsg = `${msg} — API rate limit reached. Try again later.`;
+        } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+          displayMsg = 'Network error — check your internet connection.';
+        }
+        setTranscriptionError(displayMsg);
       } finally {
         setIsTranscribing(false);
       }
     },
-    [mediaFiles, setTranscript, setActiveTranscriptMediaId, settings.deepgramApiKey],
+    [mediaFiles, setTranscript, setActiveTranscriptMediaId, settings.deepgramApiKey, settings.openaiApiKey],
   );
 
   const handleWordClick = useCallback(
@@ -80,6 +100,9 @@ export function TranscriptPanel() {
   const handleAddCaptionsToTimeline = useCallback(() => {
     if (!activeTranscriptMediaId) return;
     addTranscriptCaptionsToTimeline(activeTranscriptMediaId);
+    setCaptionsJustAdded(true);
+    if (captionsTimerRef.current) clearTimeout(captionsTimerRef.current);
+    captionsTimerRef.current = setTimeout(() => setCaptionsJustAdded(false), 3000);
   }, [activeTranscriptMediaId, addTranscriptCaptionsToTimeline]);
 
   const fillerCount = activeTranscript
@@ -176,66 +199,81 @@ export function TranscriptPanel() {
 
       {/* AI Actions */}
       {activeTranscript && (
-        <div className="px-3 py-2 border-b flex gap-2 flex-wrap" style={{ borderColor: 'var(--border)' }}>
-          {/* Filler removal */}
-          <div className="flex items-center gap-1">
-            <select
-              className="text-xs px-1.5 py-1 rounded border"
-              style={{
-                background: 'var(--bg-surface)',
-                borderColor: 'var(--border)',
-                color: 'var(--text-primary)',
-              }}
-              value={fillerMode}
-              onChange={(e) => setFillerMode(e.target.value as FillerRemovalMode)}
-            >
-              {fillerModeOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <button
-              onClick={handleRemoveFillers}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors hover:opacity-80"
-              style={{
-                background: fillerCount > 0 ? 'var(--filler-highlight)' : 'var(--bg-surface)',
-                color: fillerCount > 0 ? '#000' : 'var(--text-secondary)',
-              }}
-              title={t.transcript.fillersTooltip}
-            >
-              <Wand2 size={11} />
-              {t.transcript.fillers} ({fillerCount})
-            </button>
+        <>
+          {/* Prominent Add Captions button */}
+          <div className="px-3 pt-2 pb-1" style={{ borderBottom: 'none' }}>
+            {captionsJustAdded ? (
+              <div
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-semibold"
+                style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}
+              >
+                <CheckCircle size={13} />
+                Captions added to T1 track!
+              </div>
+            ) : (
+              <button
+                onClick={handleAddCaptionsToTimeline}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-semibold transition-colors hover:opacity-90"
+                style={{ background: 'var(--accent)', color: 'white' }}
+                title="Add transcript as caption text overlays on the timeline"
+              >
+                <MessageSquarePlus size={13} />
+                {t.transcript.addCaptionsToTimeline ?? 'Add Captions to Timeline'}
+              </button>
+            )}
           </div>
 
-          {/* Scene detection */}
-          <button
-            onClick={handleDetectScenes}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors hover:opacity-80"
-            style={{ background: 'var(--scene-border)', color: 'white' }}
-            title={t.transcript.detectScenesTooltip}
-          >
-            <Layers size={11} />
-            {t.transcript.detectScenes}
-          </button>
+          {/* Secondary actions row */}
+          <div className="px-3 pb-2 border-b flex gap-2 flex-wrap" style={{ borderColor: 'var(--border)' }}>
+            {/* Filler removal */}
+            <div className="flex items-center gap-1">
+              <select
+                className="text-xs px-1.5 py-1 rounded border"
+                style={{
+                  background: 'var(--bg-surface)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text-primary)',
+                }}
+                value={fillerMode}
+                onChange={(e) => setFillerMode(e.target.value as FillerRemovalMode)}
+              >
+                {fillerModeOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleRemoveFillers}
+                className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors hover:opacity-80"
+                style={{
+                  background: fillerCount > 0 ? 'var(--filler-highlight)' : 'var(--bg-surface)',
+                  color: fillerCount > 0 ? '#000' : 'var(--text-secondary)',
+                }}
+                title={t.transcript.fillersTooltip}
+              >
+                <Wand2 size={11} />
+                {t.transcript.fillers} ({fillerCount})
+              </button>
+            </div>
 
-          {/* Add captions to timeline */}
-          <button
-            onClick={handleAddCaptionsToTimeline}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors hover:opacity-80"
-            style={{ background: 'var(--accent)', color: 'white' }}
-            title="Add transcript as caption text overlays on the timeline"
-          >
-            <MessageSquarePlus size={11} />
-            {t.transcript.addCaptionsToTimeline ?? 'Add Captions'}
-          </button>
-        </div>
+            {/* Scene detection */}
+            <button
+              onClick={handleDetectScenes}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors hover:opacity-80"
+              style={{ background: 'var(--scene-border)', color: 'white' }}
+              title={t.transcript.detectScenesTooltip}
+            >
+              <Layers size={11} />
+              {t.transcript.detectScenes}
+            </button>
+          </div>
+        </>
       )}
 
       {/* Demo mode banner */}
       {activeTranscript && !settings.deepgramApiKey && !settings.openaiApiKey && (
-        <div className="px-3 py-1.5 border-b text-xs flex items-center gap-1.5" style={{ borderColor: 'var(--border)', background: 'rgba(245,158,11,0.1)', color: 'var(--filler-highlight)' }}>
-          <span className="font-bold">DEMO</span>
-          <span>— placeholder text, not from your video. Add a Deepgram or OpenAI key in Settings.</span>
+        <div className="px-3 py-1.5 border-b text-xs" style={{ borderColor: 'var(--border)', background: 'rgba(245,158,11,0.08)', color: 'var(--text-secondary)' }}>
+          <span className="font-bold" style={{ color: 'var(--filler-highlight)' }}>DEMO</span>
+          {' '}— captions still work, but text won't match your audio. Add a Deepgram or OpenAI key in Settings for real transcription.
         </div>
       )}
 
