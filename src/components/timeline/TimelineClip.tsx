@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useMemo } from 'react';
+import { useRef, useCallback, useState, useMemo, useEffect } from 'react';
 import { Link, AlertTriangle } from 'lucide-react';
 import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
@@ -6,40 +6,88 @@ import { ClipContextMenu } from './ClipContextMenu';
 import { createMediaFile } from '../../utils/media';
 import type { TimelineClip as TClip } from '../../types';
 
-/** Seeded PRNG for deterministic waveforms per clip */
-function seededRandom(seed: string) {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) {
-    h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+const BAR_COUNT = 80;
+
+/** Cache decoded peak data by blob URL (not mediaFileId — URL changes on re-link) */
+const waveformCache = new Map<string, Float32Array>();
+
+/** Decode real peak amplitudes from a media URL using the Web Audio API */
+async function decodeWaveformPeaks(url: string): Promise<Float32Array> {
+  const ctx = new AudioContext();
+  try {
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    const channel = audioBuffer.getChannelData(0);
+    const samplesPerBar = Math.max(1, Math.floor(channel.length / BAR_COUNT));
+    const peaks = new Float32Array(BAR_COUNT);
+    for (let i = 0; i < BAR_COUNT; i++) {
+      let max = 0;
+      const start = i * samplesPerBar;
+      const end = Math.min(start + samplesPerBar, channel.length);
+      for (let j = start; j < end; j++) {
+        const abs = Math.abs(channel[j]);
+        if (abs > max) max = abs;
+      }
+      peaks[i] = max;
+    }
+    return peaks;
+  } finally {
+    ctx.close();
   }
-  return () => {
-    h = (h * 16807 + 0) % 2147483647;
-    return (h & 0x7fffffff) / 0x7fffffff;
-  };
 }
 
-/** Stable waveform bars — heights are seeded from clip ID */
-function WaveformBars({ clipId }: { clipId: string }) {
-  const bars = useMemo(() => {
-    const rng = seededRandom(clipId);
-    const count = 80;
-    return Array.from({ length: count }, (_, i) => {
-      const t = i / (count - 1); // 0..1 position
-      // Envelope: louder in middle, quieter at edges
-      const envelope = 0.4 + 0.6 * Math.sin(t * Math.PI);
-      const h = (rng() * 16 + 2) * envelope;
-      return { i, h };
-    });
-  }, [clipId]);
+/** Renders a real waveform derived from the actual audio sample data */
+function WaveformBars({ url, mediaOffset, clipMediaDuration, fileDuration }: {
+  url: string;
+  mediaOffset: number;
+  clipMediaDuration: number; // clip.duration * clip.speed (source media seconds consumed)
+  fileDuration: number;
+}) {
+  const [peaks, setPeaks] = useState<Float32Array | null>(() => waveformCache.get(url) ?? null);
 
-  const totalW = 80 * 1.25; // count * spacing
+  useEffect(() => {
+    if (waveformCache.has(url)) {
+      setPeaks(waveformCache.get(url)!);
+      return;
+    }
+    let cancelled = false;
+    decodeWaveformPeaks(url).then((p) => {
+      if (cancelled) return;
+      waveformCache.set(url, p);
+      setPeaks(p);
+    }).catch(() => { /* silently ignore decode errors — waveform stays hidden */ });
+    return () => { cancelled = true; };
+  }, [url]);
+
+  // Slice to only the portion of the file that this clip covers
+  const visiblePeaks = useMemo(() => {
+    if (!peaks || fileDuration <= 0) return null;
+    const startFraction = mediaOffset / fileDuration;
+    const endFraction = Math.min(1, (mediaOffset + clipMediaDuration) / fileDuration);
+    const startBar = Math.floor(startFraction * BAR_COUNT);
+    const endBar = Math.min(BAR_COUNT, Math.ceil(endFraction * BAR_COUNT));
+    return peaks.slice(Math.max(0, startBar), Math.max(startBar + 1, endBar));
+  }, [peaks, mediaOffset, clipMediaDuration, fileDuration]);
+
+  const svgBars = useMemo(() => {
+    if (!visiblePeaks) return null;
+    const count = visiblePeaks.length;
+    const totalW = count * 1.25;
+    return (
+      <svg viewBox={`0 0 ${totalW} 20`} className="w-full h-4/5" preserveAspectRatio="none">
+        {Array.from(visiblePeaks).map((peak, i) => {
+          const h = Math.max(1, peak * 18);
+          return <rect key={i} x={i * 1.25} y={10 - h / 2} width={0.8} height={h} fill="rgba(255,255,255,0.8)" rx={0.3} />;
+        })}
+      </svg>
+    );
+  }, [visiblePeaks]);
+
+  if (!svgBars) return null;
   return (
     <div className="absolute inset-0 flex items-center justify-center opacity-50 pointer-events-none">
-      <svg viewBox={`0 0 ${totalW} 20`} className="w-full h-4/5" preserveAspectRatio="none">
-        {bars.map(({ i, h }) => (
-          <rect key={i} x={i * 1.25} y={10 - h / 2} width={0.8} height={h} fill="rgba(255,255,255,0.8)" rx={0.3} />
-        ))}
-      </svg>
+      {svgBars}
     </div>
   );
 }
@@ -160,12 +208,14 @@ export function TimelineClipComponent({ clip }: Props) {
             }
 
             // Detect cross-track drop via DOM
+            // Image clips live on video tracks, so map 'image' → 'video' for matching
+            const clipTrackType = clip.type === 'image' ? 'video' : clip.type;
             let targetTrackId: string | undefined;
             const els = document.elementsFromPoint(moveEvent.clientX, moveEvent.clientY);
             for (const el of els) {
               const tid = (el as HTMLElement).dataset?.trackId;
               const ttype = (el as HTMLElement).dataset?.trackType;
-              if (tid && ttype === clip.type) {
+              if (tid && ttype === clipTrackType) {
                 targetTrackId = tid !== clip.trackId ? tid : undefined;
                 break;
               }
@@ -432,9 +482,14 @@ export function TimelineClipComponent({ clip }: Props) {
           </div>
         )}
 
-        {/* Audio waveform placeholder */}
-        {!isVideo && width > 30 && (
-          <WaveformBars clipId={clip.id} />
+        {/* Real audio waveform — audio clips only */}
+        {clip.type === 'audio' && width > 30 && !isMissing && mediaFiles[clip.mediaFileId]?.url && (
+          <WaveformBars
+            url={mediaFiles[clip.mediaFileId].url}
+            mediaOffset={clip.mediaOffset}
+            clipMediaDuration={clip.duration * (clip.speed ?? 1)}
+            fileDuration={mediaFiles[clip.mediaFileId].duration}
+          />
         )}
       </div>
 

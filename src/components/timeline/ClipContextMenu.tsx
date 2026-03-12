@@ -86,8 +86,11 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const left = position.x + MENU_WIDTH > vw ? Math.max(0, vw - MENU_WIDTH - 8) : position.x;
-  // Top is adjusted dynamically after render, but cap at a safe value
-  const top = Math.min(position.y, vh - 80);
+  // If the click was in the lower half of the screen, anchor the menu bottom to the cursor
+  // so it opens upward instead of scrolling
+  const openUpward = position.y > vh / 2;
+  const top = openUpward ? undefined : position.y;
+  const bottom = openUpward ? vh - position.y : undefined;
 
   // Styles
   const item: React.CSSProperties = {
@@ -118,13 +121,13 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
     <div
       ref={menuRef}
       style={{
-        position: 'fixed', left, top, zIndex: 9999,
+        position: 'fixed', left, top, bottom, zIndex: 9999,
         background: 'var(--bg-secondary)',
         border: '1px solid var(--border)',
         borderRadius: 6, padding: '4px 0',
         width: MENU_WIDTH,
         boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-        maxHeight: vh - top - 8,
+        maxHeight: '80vh',
         overflowY: 'auto',
       }}
     >
@@ -141,22 +144,26 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
       )}
       {(isVideo || isLinked) && <div style={sep} />}
 
-      {/* Speed */}
-      <button style={sectionHeader} onClick={() => toggle('speed')}>
-        <span>{cm.speed}</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-secondary)', fontSize: 11 }}>
-          {clipSpeed}×{openSection === 'speed' ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-        </span>
-      </button>
-      {openSection === 'speed' && (
-        <div style={chipRow}>
-          {SPEED_OPTIONS.map((opt) => (
-            <button key={opt.value} style={chip(clipSpeed === opt.value)}
-              onClick={() => handleAction(() => setClipSpeed(clipId, opt.value))}>
-              {opt.label}
-            </button>
-          ))}
-        </div>
+      {/* Speed — not applicable to images (they have no time-based playback) */}
+      {!isImage && (
+        <>
+          <button style={sectionHeader} onClick={() => toggle('speed')}>
+            <span>{cm.speed}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-secondary)', fontSize: 11 }}>
+              {clipSpeed}×{openSection === 'speed' ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            </span>
+          </button>
+          {openSection === 'speed' && (
+            <div style={chipRow}>
+              {SPEED_OPTIONS.map((opt) => (
+                <button key={opt.value} style={chip(clipSpeed === opt.value)}
+                  onClick={() => handleAction(() => setClipSpeed(clipId, opt.value))}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Fit Mode (video + image) */}
@@ -312,19 +319,22 @@ export function ClipContextMenu({ clipId, position, onClose }: Props) {
 
       <div style={sep} />
 
-      {/* Volume */}
-      <div style={{ ...item, cursor: 'default', gap: 8 }}>
-        <span style={{ minWidth: 42, fontSize: 12 }}>{cm.volume}</span>
-        <input type="range" min={0} max={200} value={Math.round(clip.volume * 100)}
-          onChange={(e) => setClipVolume(clipId, Number(e.target.value) / 100)}
-          style={{ flex: 1, height: 4, accentColor: 'var(--accent)' }}
-          onClick={(e) => e.stopPropagation()} />
-        <span style={{ fontSize: 11, color: 'var(--text-secondary)', minWidth: 32, textAlign: 'right' }}>
-          {Math.round(clip.volume * 100)}%
-        </span>
-      </div>
-
-      <div style={sep} />
+      {/* Volume — not applicable to images (no audio channel) */}
+      {!isImage && (
+        <>
+          <div style={{ ...item, cursor: 'default', gap: 8 }}>
+            <span style={{ minWidth: 42, fontSize: 12 }}>{cm.volume}</span>
+            <input type="range" min={0} max={200} value={Math.round(clip.volume * 100)}
+              onChange={(e) => setClipVolume(clipId, Number(e.target.value) / 100)}
+              style={{ flex: 1, height: 4, accentColor: 'var(--accent)' }}
+              onClick={(e) => e.stopPropagation()} />
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)', minWidth: 32, textAlign: 'right' }}>
+              {Math.round(clip.volume * 100)}%
+            </span>
+          </div>
+          <div style={sep} />
+        </>
+      )}
 
       {/* Delete */}
       <button style={{ ...item, color: 'var(--playhead)' }}

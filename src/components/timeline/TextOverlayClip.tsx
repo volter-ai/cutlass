@@ -55,7 +55,18 @@ export function TextOverlayClip({ overlay }: Props) {
             }
             newTime = Math.max(0, snapped);
           }
-          updateTextOverlay(overlay.id, { startTime: newTime });
+          // Detect cross-track drop via DOM (text tracks only)
+          let targetTrackId: string | undefined;
+          const els = document.elementsFromPoint(moveEvent.clientX, moveEvent.clientY);
+          for (const el of els) {
+            const tid = (el as HTMLElement).dataset?.trackId;
+            const ttype = (el as HTMLElement).dataset?.trackType;
+            if (tid && ttype === 'text') {
+              targetTrackId = tid !== overlay.trackId ? tid : undefined;
+              break;
+            }
+          }
+          updateTextOverlay(overlay.id, { startTime: newTime, ...(targetTrackId ? { trackId: targetTrackId } : {}) });
         } else {
           let newDuration = dragStartRef.current.duration + delta;
           if (doSnap) {

@@ -231,9 +231,20 @@ export function Toolbar() {
         >
           <ZoomOut size={14} />
         </button>
-        <span className="text-xs w-10 text-center" style={{ color: 'var(--text-secondary)' }}>
+        <button
+          onClick={() => {
+            if (duration > 0) {
+              // Fit the full timeline within roughly 80% of the window width minus track headers
+              const available = window.innerWidth * 0.6 - 100;
+              setZoom(Math.max(10, available / duration));
+            }
+          }}
+          className="text-xs px-1.5 py-0.5 rounded transition-colors hover:opacity-80"
+          style={{ color: 'var(--text-secondary)', minWidth: 36, textAlign: 'center' }}
+          title="Zoom to fit (show full timeline)"
+        >
           {Math.round(zoom)}%
-        </span>
+        </button>
         <button
           onClick={() => setZoom(zoom * 1.2)}
           className="p-1.5 rounded transition-colors hover:opacity-80"

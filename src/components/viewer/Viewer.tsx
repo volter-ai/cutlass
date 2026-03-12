@@ -84,7 +84,7 @@ function getAnimationStyle(
 
 export function Viewer() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const videoAreaRef = useRef<HTMLDivElement>(null);
 
   const playheadPosition = useTimelineStore((s) => s.playheadPosition);
   const isPlaying = useTimelineStore((s) => s.isPlaying);
@@ -96,17 +96,23 @@ export function Viewer() {
   const backgroundColor = useTimelineStore((s) => s.settings.backgroundColor ?? '#000000');
   const { t } = useLanguage();
 
-  // Track container width for scaling text overlays
-  const [containerWidth, setContainerWidth] = useState(640);
+  // Track the video area container size to compute exact pixel display dimensions
+  const [videoAreaSize, setVideoAreaSize] = useState({ width: 640, height: 360 });
   useEffect(() => {
-    const el = containerRef.current;
+    const el = videoAreaRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
-      setContainerWidth(entries[0].contentRect.width);
+      const { width, height } = entries[0].contentRect;
+      setVideoAreaSize({ width, height });
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Compute the largest box that fits resolution aspect ratio within the video area
+  const ar = resolution.width / resolution.height;
+  const displayWidth = Math.min(videoAreaSize.width, videoAreaSize.height * ar);
+  const displayHeight = displayWidth / ar;
 
   // Find the active video clip at the current playhead position (video type only)
   const activeClip = useMemo(() => {
@@ -173,7 +179,7 @@ export function Viewer() {
     );
   }, [textOverlays, playheadPosition]);
 
-  const fontScale = containerWidth / resolution.width;
+  const fontScale = displayWidth / resolution.width;
 
   // Sync video element with playhead
   useEffect(() => {
@@ -216,7 +222,7 @@ export function Viewer() {
   }, [activeClip]);
 
   const handleFullscreen = useCallback(() => {
-    containerRef.current?.requestFullscreen?.();
+    videoAreaRef.current?.requestFullscreen?.();
   }, []);
 
   // Build combined transform: base (scale/position) + animation
@@ -227,7 +233,6 @@ export function Viewer() {
 
   return (
     <div
-      ref={containerRef}
       className="flex flex-col h-full relative"
       style={{ background: '#000' }}
     >
@@ -249,12 +254,14 @@ export function Viewer() {
       </div>
 
       {/* Video Area */}
-      <div className="flex-1 flex items-center justify-center relative overflow-hidden">
+      <div ref={videoAreaRef} className="flex-1 flex items-center justify-center relative overflow-hidden">
         <div
-          className="relative max-w-full max-h-full overflow-hidden"
+          className="relative overflow-hidden"
           style={{
-            aspectRatio: `${resolution.width}/${resolution.height}`,
+            width: displayWidth,
+            height: displayHeight,
             background: backgroundColor,
+            flexShrink: 0,
           }}
         >
           {activeMedia ? (

@@ -89,17 +89,9 @@ export function useKeyboardShortcuts() {
         case 'd':
           if (isMeta && store.selectedClipIds.length > 0) {
             e.preventDefault();
-            // Duplicate selected clips, placing copies right after originals
+            // Duplicate selected clips — preserves all clip properties (speed, volume, animation, fades)
             for (const id of [...store.selectedClipIds]) {
-              const clip = store.clips[id];
-              if (!clip) continue;
-              store.addClipToTrack(
-                clip.mediaFileId,
-                clip.trackId,
-                clip.startTime + clip.duration,
-                clip.mediaOffset,
-                clip.duration,
-              );
+              store.duplicateClip(id);
             }
           }
           break;

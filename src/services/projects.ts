@@ -2,8 +2,27 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import type { TimelineState } from '../store/timeline';
 import type { Project } from '../types';
 
-const LOCAL_PROJECTS_KEY = 'cutlass-projects';
 const LOCAL_AUTOSAVE_KEY = 'cutlass-autosave';
+const LOCAL_USER_EMAIL_KEY = 'cutlass-user-email';
+
+/** Persist the current user's email so local projects survive page refresh. */
+export function persistUserEmail(email: string): void {
+  try { localStorage.setItem(LOCAL_USER_EMAIL_KEY, email); } catch { /* ignore */ }
+}
+
+/** Clear persisted email on sign-out. */
+export function clearPersistedEmail(): void {
+  try { localStorage.removeItem(LOCAL_USER_EMAIL_KEY); } catch { /* ignore */ }
+}
+
+/** Return the localStorage key for projects — namespaced by email if available. */
+function localProjectsKey(): string {
+  try {
+    const email = localStorage.getItem(LOCAL_USER_EMAIL_KEY);
+    if (email) return `cutlass-projects-${email}`;
+  } catch { /* ignore */ }
+  return 'cutlass-projects';
+}
 
 // ─── Serialization ───────────────────────────────────────────────────
 
@@ -71,13 +90,13 @@ interface LocalProject {
 
 function getLocalProjects(): LocalProject[] {
   try {
-    const raw = localStorage.getItem(LOCAL_PROJECTS_KEY);
+    const raw = localStorage.getItem(localProjectsKey());
     return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 }
 
 function setLocalProjects(projects: LocalProject[]) {
-  localStorage.setItem(LOCAL_PROJECTS_KEY, JSON.stringify(projects));
+  localStorage.setItem(localProjectsKey(), JSON.stringify(projects));
 }
 
 function localToProject(lp: LocalProject): Project {
@@ -120,9 +139,12 @@ function mapRow(row: { id: string; name: string; updated_at: string; created_at:
 
 export async function listProjects(): Promise<Project[]> {
   if (isSupabaseConfigured()) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
     const { data, error } = await supabase
       .from('projects')
       .select('id, name, updated_at, created_at, thumbnail')
+      .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
     if (error) throw new Error(error.message);
     return (data ?? []).map(mapRow);
@@ -167,10 +189,13 @@ export async function saveProject(projectId: string, name: string, state: Timeli
   autoSaveLocal(state);
 
   if (isSupabaseConfigured()) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
     const { error } = await supabase
       .from('projects')
       .update({ name, timeline_state, updated_at: new Date().toISOString() })
-      .eq('id', projectId);
+      .eq('id', projectId)
+      .eq('user_id', user.id);
     if (error) throw new Error(error.message);
     return;
   }
@@ -185,10 +210,13 @@ export async function saveProject(projectId: string, name: string, state: Timeli
 
 export async function loadProject(projectId: string): Promise<{ project: Project; timelineData: Record<string, unknown> }> {
   if (isSupabaseConfigured()) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
     const { data, error } = await supabase
       .from('projects')
       .select('*')
       .eq('id', projectId)
+      .eq('user_id', user.id)
       .single();
     if (error) throw new Error(error.message);
     return { project: mapRow(data), timelineData: (data.timeline_state ?? {}) as Record<string, unknown> };
@@ -202,10 +230,13 @@ export async function loadProject(projectId: string): Promise<{ project: Project
 
 export async function deleteProject(projectId: string): Promise<void> {
   if (isSupabaseConfigured()) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
     const { error } = await supabase
       .from('projects')
       .delete()
-      .eq('id', projectId);
+      .eq('id', projectId)
+      .eq('user_id', user.id);
     if (error) throw new Error(error.message);
     return;
   }
@@ -216,10 +247,13 @@ export async function deleteProject(projectId: string): Promise<void> {
 
 export async function renameProject(projectId: string, name: string): Promise<void> {
   if (isSupabaseConfigured()) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
     const { error } = await supabase
       .from('projects')
       .update({ name })
-      .eq('id', projectId);
+      .eq('id', projectId)
+      .eq('user_id', user.id);
     if (error) throw new Error(error.message);
     return;
   }

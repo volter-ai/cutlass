@@ -112,12 +112,13 @@ export interface TimelineState {
   setClipAnimation: (clipId: string, animation: ClipAnimation | undefined) => void;
   setClipFade: (clipId: string, edge: 'in' | 'out', duration: number) => void;
   setClipTransition: (clipId: string, edge: 'in' | 'out', transition: Transition | undefined) => void;
+  duplicateClip: (clipId: string) => string | null;
   extractAudioFromClip: (clipId: string) => string | null;
   unlinkClips: (clipId: string) => void;
 
   // Actions - Text Overlays
   addTextOverlay: (trackId: string, startTime: number, text: string) => string;
-  updateTextOverlay: (id: string, updates: Partial<Pick<TextOverlay, 'text' | 'startTime' | 'duration' | 'fadeIn' | 'fadeOut'>> & { style?: Partial<TextOverlay['style']> }) => void;
+  updateTextOverlay: (id: string, updates: Partial<Pick<TextOverlay, 'text' | 'startTime' | 'duration' | 'fadeIn' | 'fadeOut' | 'trackId'>> & { style?: Partial<TextOverlay['style']> }) => void;
   removeTextOverlay: (id: string) => void;
   selectTextOverlay: (id: string | null) => void;
 
@@ -392,6 +393,13 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
               speed: clip.speed,
               fadeIn: 0,
               fadeOut: clip.fadeOut,
+              // Carry over visual/animation properties so the second half looks identical
+              fitMode: clip.fitMode,
+              scale: clip.scale,
+              positionX: clip.positionX,
+              positionY: clip.positionY,
+              animation: clip.animation,
+              transitionOut: clip.transitionOut,
             };
 
             clip.duration = splitPoint;
@@ -514,6 +522,23 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             }
           }),
 
+        duplicateClip: (clipId) => {
+          const clip = get().clips[clipId];
+          if (!clip) return null;
+          const newId = uuid();
+          set((state) => {
+            state.clips[newId] = {
+              ...clip,
+              id: newId,
+              startTime: clip.startTime + clip.duration,
+              // Drop linked group — the duplicate is a standalone clip
+              linkedGroupId: undefined,
+            };
+          });
+          get().recalculateDuration();
+          return newId;
+        },
+
         extractAudioFromClip: (clipId) => {
           const state = get();
           const clip = state.clips[clipId];
@@ -593,6 +618,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             if (updates.duration !== undefined) overlay.duration = updates.duration;
             if (updates.fadeIn !== undefined) overlay.fadeIn = updates.fadeIn;
             if (updates.fadeOut !== undefined) overlay.fadeOut = updates.fadeOut;
+            if (updates.trackId !== undefined) overlay.trackId = updates.trackId;
             if (updates.style) Object.assign(overlay.style, updates.style);
           }),
 

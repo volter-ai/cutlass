@@ -28,13 +28,28 @@ export function TimelineRuler() {
     return t;
   }, [zoom, duration]);
 
-  const handleRulerClick = useCallback(
+  const handleRulerMouseDown = useCallback(
     (e: React.MouseEvent) => {
       const rect = rulerRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const x = e.clientX - rect.left + (rulerRef.current?.parentElement?.scrollLeft ?? 0);
-      const time = x / zoom;
-      setPlayheadPosition(Math.max(0, time));
+
+      const getTime = (clientX: number) => {
+        const scroll = rulerRef.current?.parentElement?.scrollLeft ?? 0;
+        const x = clientX - rect.left + scroll;
+        return Math.max(0, x / zoom);
+      };
+
+      setPlayheadPosition(getTime(e.clientX));
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        setPlayheadPosition(getTime(moveEvent.clientX));
+      };
+      const handleMouseUp = () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
     },
     [zoom, setPlayheadPosition],
   );
@@ -48,7 +63,7 @@ export function TimelineRuler() {
         background: 'var(--bg-secondary)',
         borderBottom: '1px solid var(--border)',
       }}
-      onClick={handleRulerClick}
+      onMouseDown={handleRulerMouseDown}
     >
       {ticks.map(({ time, major }, i) => (
         <div
