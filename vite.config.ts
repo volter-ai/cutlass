@@ -32,5 +32,18 @@ export default defineConfig(({ mode }) => {
   // Default: standalone app build
   return {
     plugins: [react(), tailwindcss()],
+    server: {
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'require-corp',
+      },
+    },
+    optimizeDeps: {
+      // Exclude @ffmpeg/ffmpeg from Vite's pre-bundling so Vite handles
+      // new URL("./worker.js", import.meta.url) correctly — without this,
+      // esbuild flattens the package into /node_modules/.vite/deps/@ffmpeg_ffmpeg.js
+      // and the relative worker.js URL resolves to a 404, causing ffmpeg.load() to hang.
+      exclude: ['@ffmpeg/ffmpeg'],
+    },
   }
 })

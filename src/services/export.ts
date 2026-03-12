@@ -14,11 +14,29 @@ async function getFFmpeg(onProgress: (progress: number) => void): Promise<FFmpeg
     onProgress(Math.min(progress * 100, 99));
   });
 
-  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-  await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+  ffmpeg.on('log', ({ type, message }) => {
+    if (type === 'stderr') console.error('[FFmpeg]', message);
   });
+
+  // Prefer locally-served files (no CDN latency, no blob-URL Worker issues).
+  // Falls back to unpkg CDN if /ffmpeg-core/ isn't present (e.g. production without the files).
+  const localBase = `${window.location.origin}/ffmpeg-core`;
+  const cdnBase = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+  let coreURL: string;
+  let wasmURL: string;
+  try {
+    const probe = await fetch(`${localBase}/ffmpeg-core.js`, { method: 'HEAD' });
+    if (probe.ok) {
+      coreURL = `${localBase}/ffmpeg-core.js`;
+      wasmURL = `${localBase}/ffmpeg-core.wasm`;
+    } else {
+      throw new Error('local not found');
+    }
+  } catch {
+    coreURL = await toBlobURL(`${cdnBase}/ffmpeg-core.js`, 'text/javascript');
+    wasmURL = await toBlobURL(`${cdnBase}/ffmpeg-core.wasm`, 'application/wasm');
+  }
+  await ffmpeg.load({ coreURL, wasmURL });
 
   return ffmpeg;
 }
@@ -37,6 +55,15 @@ export async function exportTimeline(
   // Collect all media files used by clips
   const usedMediaIds = new Set<string>();
   Object.values(clips).forEach((clip) => usedMediaIds.add(clip.mediaFileId));
+
+  // Write font file into ffmpeg virtual filesystem (required for drawtext filter)
+  const fontPath = '/font.ttf';
+  try {
+    const fontData = await fetchFile(`${window.location.origin}/DejaVuSans-Bold.ttf`);
+    await ff.writeFile(fontPath, fontData);
+  } catch {
+    // Font unavailable — drawtext will fail gracefully; export continues without text overlays
+  }
 
   // Write source media files into ffmpeg virtual filesystem
   let fileIndex = 0;
@@ -85,8 +112,8 @@ export async function exportTimeline(
 
     if (track.type === 'video') {
       videoClips.push({ ...clip, inputIdx });
-      // Video clips contribute audio unless their audio has been extracted to a linked clip
-      if (settings.includeAudio && !(clip.linkedGroupId && linkedGroupsWithAudio.has(clip.linkedGroupId))) {
+      // Video clips contribute audio unless extracted to a linked clip or they are images (no audio stream)
+      if (settings.includeAudio && clip.type !== 'image' && !(clip.linkedGroupId && linkedGroupsWithAudio.has(clip.linkedGroupId))) {
         audioClips.push({ ...clip, inputIdx });
       }
     } else if (track.type === 'audio' && settings.includeAudio) {
@@ -141,7 +168,12 @@ export async function exportTimeline(
     const sourceDuration = clip.duration * speed;
 
     // Trim the input and apply speed
-    if (speed !== 1) {
+    if (clip.type === 'image') {
+      // Single-frame image: loop indefinitely and trim to the required clip duration
+      filterParts.push(
+        `[${clip.inputIdx}:v]loop=-1:size=1,fps=${frameRate},trim=duration=${clip.duration},setpts=PTS-STARTPTS[${trimLabel}]`,
+      );
+    } else if (speed !== 1) {
       filterParts.push(
         `[${clip.inputIdx}:v]trim=start=${clip.mediaOffset}:duration=${sourceDuration},setpts=(PTS-STARTPTS)/${speed}[${trimLabel}]`,
       );
@@ -289,7 +321,7 @@ export async function exportTimeline(
           const escapedText = text.replace(/'/g, "\\'").replace(/:/g, '\\:');
           const capLabel = `cap${captionIdx}`;
           filterParts.push(
-            `${overlayLabel}drawtext=text='${escapedText}':fontsize=${captionStyle.fontSize}:fontcolor=${captionStyle.color}:x=(w-tw)/2:y=${yPos}:enable='between(t,${start},${end})':box=1:boxcolor=${captionStyle.backgroundColor.replace(/,/g, '\\,')}:boxborderw=8[${capLabel}]`,
+            `${overlayLabel}drawtext=fontfile=${fontPath}:text='${escapedText}':fontsize=${captionStyle.fontSize}:fontcolor=${captionStyle.color}:x=(w-tw)/2:y=${yPos}:enable='between(t,${start},${end})':box=1:boxcolor=${captionStyle.backgroundColor.replace(/,/g, '\\,')}:boxborderw=8[${capLabel}]`,
           );
           overlayLabel = `[${capLabel}]`;
           captionIdx++;
@@ -306,7 +338,7 @@ export async function exportTimeline(
       : '20';
     const y = `h*${overlay.style.y / 100}`;
 
-    let drawtext = `drawtext=text='${escapedText}':fontsize=${overlay.style.fontSize}:fontcolor=${overlay.style.color}:x=${x}:y=${y}:enable='between(t,${overlay.startTime},${overlay.startTime + overlay.duration})'`;
+    let drawtext = `drawtext=fontfile=${fontPath}:text='${escapedText}':fontsize=${overlay.style.fontSize}:fontcolor=${overlay.style.color}:x=${x}:y=${y}:enable='between(t,${overlay.startTime},${overlay.startTime + overlay.duration})'`;
 
     if (overlay.style.outline) {
       drawtext += `:borderw=2:bordercolor=${overlay.style.outlineColor}`;

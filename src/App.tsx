@@ -17,6 +17,7 @@ import { autoSaveLocal, loadAutoSave, deserializeProject } from './services/proj
 import { getMediaFile } from './services/mediaStorage';
 import { createMediaFile } from './utils/media';
 import { useLanguage } from './context/LanguageProvider';
+import { exportTimeline } from './services/export';
 
 const TABS = ['media', 'transcript', 'ai', 'settings'] as const;
 
@@ -28,6 +29,12 @@ export default function App() {
   const leftPanelTab = useTimelineStore((s) => s.leftPanelTab);
   const setLeftPanelTab = useTimelineStore((s) => s.setLeftPanelTab);
   const storeApi = useTimelineStoreApi();
+  // Expose store and export function for automated testing in development
+  if (import.meta.env.DEV) {
+    const w = window as unknown as Record<string, unknown>;
+    w.__cutlassStore = storeApi;
+    w.__exportTimeline = exportTimeline;
+  }
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasRestoredRef = useRef(false);
   const { t } = useLanguage();
