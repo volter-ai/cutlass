@@ -37,6 +37,15 @@ export default defineConfig(({ mode }) => {
         'Cross-Origin-Opener-Policy': 'same-origin',
         'Cross-Origin-Embedder-Policy': 'require-corp',
       },
+      proxy: {
+        // Proxy OpenAI API calls through the dev server to avoid CORS issues
+        '/api/openai': {
+          target: 'https://api.openai.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/openai/, ''),
+          secure: true,
+        },
+      },
     },
     optimizeDeps: {
       // Exclude @ffmpeg/ffmpeg from Vite's pre-bundling so Vite handles

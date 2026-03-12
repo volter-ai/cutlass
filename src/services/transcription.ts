@@ -123,25 +123,111 @@ function parseDeepgramResponse(mediaFileId: string, data: DeepgramResponse): Tra
   return { mediaFileId, segments, scenes: [] };
 }
 
+const WHISPER_MAX_BYTES = 25 * 1024 * 1024; // 25 MB
+
 async function transcribeWithOpenAI(media: MediaFile, apiKey: string): Promise<Transcript> {
+  let fileToSend: File | Blob = media.file;
+
+  // If it's a video file and exceeds 25 MB, extract audio via Web Audio API
+  if (media.file.size > WHISPER_MAX_BYTES && media.type === 'video') {
+    try {
+      fileToSend = await extractAudioFromVideo(media.file);
+    } catch {
+      // If extraction fails, attempt with original and let API error surface
+    }
+  }
+
+  if (fileToSend.size > WHISPER_MAX_BYTES) {
+    throw new Error(
+      `File is ${(fileToSend.size / 1024 / 1024).toFixed(1)} MB — OpenAI Whisper has a 25 MB limit. Try a shorter clip.`,
+    );
+  }
+
   const formData = new FormData();
-  formData.append('file', media.file);
+  // Ensure the file has a proper extension so Whisper accepts it
+  const ext = media.file.name.split('.').pop() || 'mp4';
+  const named = new File([fileToSend], `audio.${ext}`, { type: fileToSend.type || media.file.type });
+  formData.append('file', named);
   formData.append('model', 'whisper-1');
   formData.append('response_format', 'verbose_json');
   formData.append('timestamp_granularities[]', 'word');
 
-  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: formData,
-  });
+  let response: Response;
+  try {
+    response = await fetch('/api/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: formData,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('Extension context invalidated')) {
+      throw new Error(
+        'A browser extension is interfering with the request. Try reloading the page or disabling extensions.',
+      );
+    }
+    throw new Error(`Network error contacting OpenAI: ${msg}`);
+  }
 
   if (!response.ok) {
-    throw new Error(`OpenAI Whisper API error: ${response.status}`);
+    let detail = '';
+    try {
+      const body = await response.json();
+      detail = body?.error?.message ? ` — ${body.error.message}` : '';
+    } catch { /* ignore */ }
+    throw new Error(`OpenAI Whisper API error: ${response.status}${detail}`);
   }
 
   const data: WhisperResponse = await response.json();
   return parseWhisperResponse(media.id, data);
+}
+
+/**
+ * Use the Web Audio API to decode and re-encode video audio to a WAV blob.
+ * This keeps file sizes manageable and avoids sending entire video payloads.
+ */
+async function extractAudioFromVideo(file: File): Promise<Blob> {
+  const audioContext = new AudioContext();
+  const arrayBuffer = await file.arrayBuffer();
+  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+  // Render to WAV
+  const numChannels = Math.min(audioBuffer.numberOfChannels, 2);
+  const sampleRate = audioBuffer.sampleRate;
+  const length = audioBuffer.length;
+  const wavBuffer = new ArrayBuffer(44 + length * numChannels * 2);
+  const view = new DataView(wavBuffer);
+
+  function writeString(offset: number, str: string) {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  }
+
+  const byteRate = sampleRate * numChannels * 2;
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + length * numChannels * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);          // PCM
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, numChannels * 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, length * numChannels * 2, true);
+
+  let offset = 44;
+  for (let i = 0; i < length; i++) {
+    for (let ch = 0; ch < numChannels; ch++) {
+      const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(ch)[i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      offset += 2;
+    }
+  }
+
+  await audioContext.close();
+  return new Blob([wavBuffer], { type: 'audio/wav' });
 }
 
 function parseWhisperResponse(mediaFileId: string, data: WhisperResponse): Transcript {

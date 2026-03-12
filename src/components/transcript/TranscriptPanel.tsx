@@ -65,10 +65,14 @@ export function TranscriptPanel() {
         console.error('Transcription failed:', err);
         const msg = err instanceof Error ? err.message : 'Transcription failed';
         let displayMsg = msg;
-        if (msg.includes('401') || msg.includes('403')) {
+        if (msg.includes('browser extension') || msg.includes('Extension context')) {
+          displayMsg = 'A browser extension is interfering. Reload the page or disable extensions, then try again.';
+        } else if (msg.includes('401') || msg.includes('403')) {
           displayMsg = `${msg} — your API key may be invalid. Check Settings.`;
         } else if (msg.includes('429')) {
           displayMsg = `${msg} — API rate limit reached. Try again later.`;
+        } else if (msg.includes('25 MB limit')) {
+          displayMsg = msg;
         } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
           displayMsg = 'Network error — check your internet connection.';
         }
