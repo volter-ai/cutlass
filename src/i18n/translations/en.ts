@@ -115,6 +115,8 @@ export const en = {
     resolution: 'Resolution',
     includeAudio: 'Include audio',
     burnCaptions: 'Burn captions into video',
+    exportSubtitles: 'Export subtitle file',
+    subtitleHint: 'Downloaded alongside video',
     exporting: 'Exporting...',
     exportBtn: 'Export',
     cancel: 'Cancel',

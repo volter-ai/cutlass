@@ -117,11 +117,13 @@ export const es: Translations = {
     resolution: 'Resoluci\u00f3n',
     includeAudio: 'Incluir audio',
     burnCaptions: 'Incrustar subt\u00edtulos en el video',
+    exportSubtitles: 'Exportar archivo de subt\u00edtulos',
+    subtitleHint: 'Se descarga junto con el video',
     exporting: 'Exportando...',
     exportBtn: 'Exportar',
     cancel: 'Cancelar',
     exportFailed: 'La exportaci\u00f3n fall\u00f3. Revisa la consola del navegador para m\u00e1s detalles.',
-    captionHint: 'Requiere subtítulos generados desde la pestaña Transcripción.',
+    captionHint: 'Requiere subt\u00edtulos generados desde la pesta\u00f1a Transcripci\u00f3n.',
   },
 
   // Settings

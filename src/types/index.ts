@@ -183,6 +183,8 @@ export interface ExportSettings {
   quality: '720p' | '1080p' | '4k';
   includeAudio: boolean;
   burnCaptions: boolean;
+  exportSubtitles: boolean;
+  subtitleFormat: 'srt' | 'vtt';
 }
 
 export interface Project {

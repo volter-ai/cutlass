@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { X, Download, Loader2, AlertTriangle } from 'lucide-react';
 import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { exportTimeline, downloadBlob } from '../../services/export';
+import { transcriptsToSrt, transcriptsToVtt } from '../../services/subtitles';
 import { useLanguage } from '../../context/LanguageProvider';
 import type { ExportSettings } from '../../types';
 
@@ -22,6 +23,8 @@ export function ExportDialog() {
     quality: '1080p',
     includeAudio: true,
     burnCaptions: false,
+    exportSubtitles: false,
+    subtitleFormat: 'srt',
   });
   const [exportError, setExportError] = useState<string | null>(null);
 
@@ -38,6 +41,17 @@ export function ExportDialog() {
 
       const ext = exportSettings.format;
       downloadBlob(blob, `cutlass-export.${ext}`);
+
+      if (exportSettings.exportSubtitles) {
+        const transcripts = Object.values(state.transcripts);
+        const maxWords = state.settings.captionStyle.maxWords;
+        const fmt = exportSettings.subtitleFormat;
+        const subtitleText = fmt === 'vtt'
+          ? transcriptsToVtt(transcripts, maxWords)
+          : transcriptsToSrt(transcripts, maxWords);
+        const subBlob = new Blob([subtitleText], { type: fmt === 'vtt' ? 'text/vtt' : 'text/plain' });
+        downloadBlob(subBlob, `cutlass-export.${fmt}`);
+      }
     } catch (err) {
       console.error('Export failed:', err);
       const message = err instanceof Error ? err.message : String(err);
@@ -138,6 +152,35 @@ export function ExportDialog() {
               <p className="text-xs ml-6" style={{ color: 'var(--text-secondary)' }}>
                 {t.export.captionHint ?? 'Requires captions generated via Transcript tab.'}
               </p>
+            )}
+            <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-primary)' }}>
+              <input
+                type="checkbox"
+                checked={exportSettings.exportSubtitles}
+                onChange={(e) => setExportSettings((s) => ({ ...s, exportSubtitles: e.target.checked }))}
+                className="rounded"
+              />
+              {t.export.exportSubtitles ?? 'Export subtitle file'}
+            </label>
+            {exportSettings.exportSubtitles && (
+              <div className="ml-6 flex gap-2">
+                {(['srt', 'vtt'] as const).map((fmt) => (
+                  <button
+                    key={fmt}
+                    onClick={() => setExportSettings((s) => ({ ...s, subtitleFormat: fmt }))}
+                    className="px-3 py-1 rounded text-xs font-semibold uppercase"
+                    style={{
+                      background: exportSettings.subtitleFormat === fmt ? 'var(--accent)' : 'var(--bg-surface)',
+                      color: exportSettings.subtitleFormat === fmt ? 'white' : 'var(--text-secondary)',
+                    }}
+                  >
+                    {fmt}
+                  </button>
+                ))}
+                <p className="text-xs self-center" style={{ color: 'var(--text-secondary)' }}>
+                  {t.export.subtitleHint ?? 'Downloaded alongside video'}
+                </p>
+              </div>
             )}
           </div>
 
