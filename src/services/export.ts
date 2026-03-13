@@ -112,8 +112,10 @@ export async function exportTimeline(
 
     if (track.type === 'video') {
       videoClips.push({ ...clip, inputIdx });
-      // Video clips contribute audio unless extracted to a linked clip or they are images (no audio stream)
-      if (settings.includeAudio && clip.type !== 'image' && !(clip.linkedGroupId && linkedGroupsWithAudio.has(clip.linkedGroupId))) {
+      // Video clips contribute audio unless extracted to a linked clip, they are images,
+      // or the source file has no audio stream (hasAudio === false).
+      const sourceMedia = mediaFiles[clip.mediaFileId];
+      if (settings.includeAudio && clip.type !== 'image' && sourceMedia?.hasAudio !== false && !(clip.linkedGroupId && linkedGroupsWithAudio.has(clip.linkedGroupId))) {
         audioClips.push({ ...clip, inputIdx });
       }
     } else if (track.type === 'audio' && settings.includeAudio) {

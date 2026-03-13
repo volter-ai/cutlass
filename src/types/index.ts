@@ -8,6 +8,8 @@ export interface MediaFile {
   thumbnail?: string;
   width?: number;
   height?: number;
+  /** Whether the video file contains an audio track (always true for audio files, undefined = unknown/assume true) */
+  hasAudio?: boolean;
 }
 
 export interface TimelineClip {

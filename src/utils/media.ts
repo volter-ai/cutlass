@@ -23,6 +23,7 @@ export async function createMediaFile(file: File): Promise<MediaFile> {
     const dims = await getVideoDimensions(url);
     result.width = dims.width;
     result.height = dims.height;
+    result.hasAudio = await checkVideoHasAudio(url);
   }
 
   return result;
@@ -63,6 +64,26 @@ function getVideoDimensions(url: string): Promise<{ width: number; height: numbe
       resolve({ width: video.videoWidth, height: video.videoHeight });
     };
     video.onerror = () => resolve({ width: 1920, height: 1080 });
+    video.src = url;
+  });
+}
+
+function checkVideoHasAudio(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      // audioTracks is supported in Chromium-based browsers
+      if (video.audioTracks && video.audioTracks.length > 0) {
+        resolve(true);
+      } else if (video.audioTracks && video.audioTracks.length === 0) {
+        resolve(false);
+      } else {
+        // API unavailable — assume audio present to preserve existing behaviour
+        resolve(true);
+      }
+    };
+    video.onerror = () => resolve(true);
     video.src = url;
   });
 }
