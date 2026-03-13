@@ -73,10 +73,11 @@ function checkVideoHasAudio(url: string): Promise<boolean> {
     const video = document.createElement('video');
     video.preload = 'metadata';
     video.onloadedmetadata = () => {
-      // audioTracks is supported in Chromium-based browsers
-      if (video.audioTracks && video.audioTracks.length > 0) {
+      // audioTracks is a Chromium-only extension not in the standard TS DOM types
+      const audioTracks = (video as HTMLVideoElement & { audioTracks?: AudioTrackList }).audioTracks;
+      if (audioTracks && audioTracks.length > 0) {
         resolve(true);
-      } else if (video.audioTracks && video.audioTracks.length === 0) {
+      } else if (audioTracks && audioTracks.length === 0) {
         resolve(false);
       } else {
         // API unavailable — assume audio present to preserve existing behaviour
