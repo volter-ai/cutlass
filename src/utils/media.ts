@@ -74,7 +74,8 @@ function checkVideoHasAudio(url: string): Promise<boolean> {
     video.preload = 'metadata';
     video.onloadedmetadata = () => {
       // audioTracks is a Chromium-only extension not in the standard TS DOM types
-      const audioTracks = (video as HTMLVideoElement & { audioTracks?: AudioTrackList }).audioTracks;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const audioTracks = (video as any).audioTracks as { length: number } | undefined;
       if (audioTracks && audioTracks.length > 0) {
         resolve(true);
       } else if (audioTracks && audioTracks.length === 0) {
