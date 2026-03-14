@@ -202,12 +202,16 @@ export function Viewer() {
 
   const fontScale = displayWidth / resolution.width;
 
-  /** Compute write-on reveal fraction (0–1) for a drawing overlay at elapsed seconds.
-   *  Each stroke gets ~1s at 1× speed; writeOnSpeed scales it (2× = faster, 0.5× = slower). */
-  function computeRevealFraction(overlay: DrawingOverlay, elapsed: number): number {
+  /** Compute write-on reveal fraction (0–1) for a single stroke at the given elapsed overlay time.
+   *  Strokes animate sequentially — stroke i starts only after stroke i-1 finishes.
+   *  Default: 0.5s per stroke at 1× speed (writeOnSpeed=2 → 0.25s, writeOnSpeed=0.5 → 1s). */
+  function computeStrokeRevealFraction(strokeIndex: number, writeOnSpeed: number, elapsed: number): number {
     if (elapsed <= 0) return 0;
-    const totalDuration = Math.max(1.0, overlay.strokes.length * 1.0 / (overlay.writeOnSpeed ?? 1));
-    return Math.min(1, elapsed / totalDuration);
+    const strokeDuration = 0.5 / writeOnSpeed;
+    const strokeStart = strokeIndex * strokeDuration;
+    const strokeElapsed = elapsed - strokeStart;
+    if (strokeElapsed <= 0) return 0;
+    return Math.min(1, strokeElapsed / strokeDuration);
   }
 
   /** Compute fade opacity for drawing/text overlays */
@@ -423,17 +427,17 @@ export function Viewer() {
               </defs>
               {activeDrawingOverlays.map((overlay) => {
                 const elapsed = playheadPosition - overlay.startTime;
-                const revealFraction = computeRevealFraction(overlay, elapsed);
                 const drawOpacity = computeOverlayOpacity(overlay);
+                const speed = overlay.writeOnSpeed ?? 1;
                 return (
                   <g key={overlay.id} opacity={drawOpacity}>
-                    {overlay.strokes.map((stroke) => (
+                    {overlay.strokes.map((stroke, strokeIndex) => (
                       <DrawingStrokeRenderer
                         key={stroke.id}
                         stroke={stroke}
                         canvasWidth={displayWidth}
                         canvasHeight={displayHeight}
-                        revealFraction={revealFraction}
+                        revealFraction={computeStrokeRevealFraction(strokeIndex, speed, elapsed)}
                       />
                     ))}
                   </g>
