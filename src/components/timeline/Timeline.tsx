@@ -31,6 +31,7 @@ export function Timeline() {
   const videoTracks = tracks.filter((t) => t.type === 'video');
   const audioTracks = tracks.filter((t) => t.type === 'audio');
   const textTracks = tracks.filter((t) => t.type === 'text');
+  const drawingTracks = tracks.filter((t) => t.type === 'drawing');
   const totalWidth = duration * zoom;
 
   // Marquee selection state
@@ -59,6 +60,13 @@ export function Timeline() {
     if (textTracks.length > 0) y += 2; // A/T divider
 
     textTracks.forEach((track) => {
+      positions[track.id] = { top: y, height: track.height };
+      y += track.height;
+    });
+
+    if (drawingTracks.length > 0) y += 2; // T/D divider
+
+    drawingTracks.forEach((track) => {
       positions[track.id] = { top: y, height: track.height };
       y += track.height;
     });
@@ -202,6 +210,13 @@ export function Timeline() {
           >
             <Plus size={10} /> {t.timeline.text}
           </button>
+          <button
+            onClick={() => addTrack('drawing')}
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors hover:opacity-80"
+            style={{ color: 'var(--bg-clip-drawing)', border: '1px solid var(--bg-clip-drawing)' }}
+          >
+            <Plus size={10} /> Drawing
+          </button>
         </div>
       </div>
 
@@ -243,6 +258,19 @@ export function Timeline() {
 
           {/* Text tracks */}
           {textTracks.map((track) => (
+            <TimelineTrack key={track.id} track={track} />
+          ))}
+
+          {/* T/D divider */}
+          {drawingTracks.length > 0 && (
+            <div className="flex" style={{ height: 2, background: 'var(--border)' }}>
+              <div style={{ width: 100 }} />
+              <div className="flex-1" />
+            </div>
+          )}
+
+          {/* Drawing tracks */}
+          {drawingTracks.map((track) => (
             <TimelineTrack key={track.id} track={track} />
           ))}
 

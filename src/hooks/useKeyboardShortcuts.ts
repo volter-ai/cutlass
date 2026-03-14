@@ -93,6 +93,8 @@ export function useKeyboardShortcuts() {
             for (const id of [...store.selectedClipIds]) {
               store.duplicateClip(id);
             }
+          } else if (!isMeta) {
+            store.setActiveTool('draw');
           }
           break;
 

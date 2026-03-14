@@ -1,6 +1,7 @@
 import { Key, Monitor, Type, Palette } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
+import { DrawingToolPanel } from './DrawingToolPanel';
 import type { AspectRatio, CaptionStyle, TextStyle } from '../../types';
 
 const FONT_FAMILIES = [
@@ -10,6 +11,7 @@ const FONT_FAMILIES = [
 
 export function SettingsPanel() {
   const { settings, setAspectRatio, setDeepgramApiKey, setOpenaiApiKey, setCaptionStyle, setBackgroundColor } = useTimelineStore();
+  const activeTool = useTimelineStore((s) => s.activeTool);
   const selectedTextOverlayId = useTimelineStore((s) => s.selectedTextOverlayId);
   const textOverlays = useTimelineStore((s) => s.textOverlays);
   const updateTextOverlay = useTimelineStore((s) => s.updateTextOverlay);
@@ -68,6 +70,9 @@ export function SettingsPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-5">
+        {/* Drawing Tool Panel (when draw mode is active) */}
+        {activeTool === 'draw' && <DrawingToolPanel />}
+
         {/* Aspect Ratio */}
         <section>
           <div className="flex items-center gap-1.5 mb-2">

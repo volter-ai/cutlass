@@ -93,6 +93,7 @@ export default function App() {
       tracks: deserialized.tracks.length > 0 ? deserialized.tracks : currentState.tracks,
       clips: deserialized.clips,
       textOverlays: deserialized.textOverlays,
+      drawingOverlays: deserialized.drawingOverlays,
       transcripts: deserialized.transcripts,
       settings: { ...currentState.settings, ...deserialized.settings },
       currentProjectId: saved.projectId,
@@ -121,6 +122,7 @@ export default function App() {
         state.clips === prevState.clips &&
         state.tracks === prevState.tracks &&
         state.textOverlays === prevState.textOverlays &&
+        state.drawingOverlays === prevState.drawingOverlays &&
         state.settings === prevState.settings
       ) return;
 

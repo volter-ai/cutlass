@@ -40,6 +40,7 @@ export function serializeProject(state: TimelineState): Record<string, unknown> 
     tracks: state.tracks,
     clips: state.clips,
     textOverlays: state.textOverlays,
+    drawingOverlays: state.drawingOverlays,
     transcripts: state.transcripts,
     settings: {
       aspectRatio: state.settings.aspectRatio,
@@ -58,6 +59,7 @@ export function deserializeProject(
   tracks: TimelineState['tracks'];
   clips: TimelineState['clips'];
   textOverlays: TimelineState['textOverlays'];
+  drawingOverlays: TimelineState['drawingOverlays'];
   transcripts: TimelineState['transcripts'];
   settings: Partial<TimelineState['settings']>;
   mediaNameMap: Record<string, string>;
@@ -71,6 +73,7 @@ export function deserializeProject(
     tracks: (data.tracks ?? []) as TimelineState['tracks'],
     clips: (data.clips ?? {}) as TimelineState['clips'],
     textOverlays: (data.textOverlays ?? {}) as TimelineState['textOverlays'],
+    drawingOverlays: (data.drawingOverlays ?? {}) as TimelineState['drawingOverlays'],
     transcripts: (data.transcripts ?? {}) as TimelineState['transcripts'],
     settings: (data.settings ?? {}) as Partial<TimelineState['settings']>,
     mediaNameMap,
