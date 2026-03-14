@@ -436,21 +436,44 @@ export async function exportTimeline(
         animLabel = animOut;
       } else if (anim === 'zoom-in') {
         // 1.0x → 1.3x zoom, keeping center (matches Viewer CSS scale 1.0→1.3)
-        filterParts.push(
-          `[${animLabel}]zoompan=z='min(1+0.3*on/${totalFrames},1.3)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${totalFrames}:s=${W}x${H}:fps=${frameRate}[${animOut}]`,
-        );
+        if (clip.type === 'image') {
+          // zoompan is correct for still images (single source frame)
+          filterParts.push(
+            `[${animLabel}]zoompan=z='min(1+0.3*on/${totalFrames},1.3)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${totalFrames}:s=${W}x${H}:fps=${frameRate}[${animOut}]`,
+          );
+        } else {
+          // For video: scale+crop with time expressions to preserve all frames.
+          // zoompan's d parameter processes only the FIRST input frame for d output
+          // frames, freezing video into a slideshow.
+          // scale needs eval=frame to allow per-frame 't' expressions.
+          filterParts.push(
+            `[${animLabel}]scale=w='trunc(${W}*min(1+0.3*t/${dur},1.3)/2)*2':h='trunc(${H}*min(1+0.3*t/${dur},1.3)/2)*2':eval=frame,crop=${W}:${H}:(iw-${W})/2:(ih-${H})/2[${animOut}]`,
+          );
+        }
         animLabel = animOut;
       } else if (anim === 'zoom-out') {
         // 1.3x → 1.0x zoom, keeping center (matches Viewer CSS scale 1.3→1.0)
-        filterParts.push(
-          `[${animLabel}]zoompan=z='max(1.3-0.3*on/${totalFrames},1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${totalFrames}:s=${W}x${H}:fps=${frameRate}[${animOut}]`,
-        );
+        if (clip.type === 'image') {
+          filterParts.push(
+            `[${animLabel}]zoompan=z='max(1.3-0.3*on/${totalFrames},1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${totalFrames}:s=${W}x${H}:fps=${frameRate}[${animOut}]`,
+          );
+        } else {
+          filterParts.push(
+            `[${animLabel}]scale=w='trunc(${W}*max(1.3-0.3*t/${dur},1.0)/2)*2':h='trunc(${H}*max(1.3-0.3*t/${dur},1.0)/2)*2':eval=frame,crop=${W}:${H}:(iw-${W})/2:(ih-${H})/2[${animOut}]`,
+          );
+        }
         animLabel = animOut;
       } else if (anim === 'ken-burns') {
         // 1.0x → 1.2x zoom with 5% rightward and 3% upward pan (matches Viewer CSS)
-        filterParts.push(
-          `[${animLabel}]zoompan=z='min(1+0.2*on/${totalFrames},1.2)':x='iw/2+on/${totalFrames}*0.05*iw-(iw/zoom/2)':y='ih/2-on/${totalFrames}*0.03*ih-(ih/zoom/2)':d=${totalFrames}:s=${W}x${H}:fps=${frameRate}[${animOut}]`,
-        );
+        if (clip.type === 'image') {
+          filterParts.push(
+            `[${animLabel}]zoompan=z='min(1+0.2*on/${totalFrames},1.2)':x='iw/2+on/${totalFrames}*0.05*iw-(iw/zoom/2)':y='ih/2-on/${totalFrames}*0.03*ih-(ih/zoom/2)':d=${totalFrames}:s=${W}x${H}:fps=${frameRate}[${animOut}]`,
+          );
+        } else {
+          filterParts.push(
+            `[${animLabel}]scale=w='trunc(${W}*min(1+0.2*t/${dur},1.2)/2)*2':h='trunc(${H}*min(1+0.2*t/${dur},1.2)/2)*2':eval=frame,crop=${W}:${H}:(iw-${W})/2+t/${dur}*0.05*${W}:(ih-${H})/2-t/${dur}*0.03*${H}[${animOut}]`,
+          );
+        }
         animLabel = animOut;
       }
       // slide-* animations remain preview-only
