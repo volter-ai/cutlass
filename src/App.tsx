@@ -116,7 +116,7 @@ export default function App() {
   // Auto-save on timeline changes (debounced 3s)
   useEffect(() => {
     const unsub = storeApi.subscribe((state, prevState) => {
-      // Only auto-save when meaningful data changes
+      // Only react when meaningful data changes
       if (
         state.clips === prevState.clips &&
         state.tracks === prevState.tracks &&
@@ -124,14 +124,18 @@ export default function App() {
         state.settings === prevState.settings
       ) return;
 
+      // Mark dirty immediately so the * indicator appears as soon as edits happen
+      storeApi.getState().markProjectDirty();
+
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = setTimeout(() => {
-        const current = storeApi.getState();
-        autoSaveLocal(current);
-        current.markProjectDirty();
+        autoSaveLocal(storeApi.getState());
       }, 3000);
     });
-    return unsub;
+    return () => {
+      unsub();
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
   }, [storeApi]);
 
   return (

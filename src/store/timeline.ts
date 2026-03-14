@@ -20,6 +20,10 @@ import type {
   AspectRatio,
   ProjectSettings,
   CaptionStyle,
+  DrawingOverlay,
+  DrawingStroke,
+  DrawingToolType,
+  DrawingTexture,
 } from '../types';
 
 const DEFAULT_CAPTION_STYLE: CaptionStyle = {
@@ -64,6 +68,15 @@ export interface TimelineState {
   selectedClipIds: string[];
   selectedTextOverlayId: string | null;
   activeTool: Tool;
+
+  // Drawing overlays
+  drawingOverlays: Record<string, DrawingOverlay>;
+  selectedDrawingOverlayId: string | null;
+  activeDrawingTool: DrawingToolType;
+  activeDrawingColor: string;
+  activeDrawingStrokeWidth: number;
+  activeDrawingTexture: DrawingTexture;
+  activeDrawingWriteOnSpeed: number;
 
   // Transcript
   transcripts: Record<string, Transcript>;
@@ -123,8 +136,21 @@ export interface TimelineState {
   removeTextOverlay: (id: string) => void;
   selectTextOverlay: (id: string | null) => void;
 
+  // Actions - Drawing Overlays
+  addDrawingOverlay: (trackId: string, startTime: number) => string;
+  updateDrawingOverlay: (id: string, updates: Partial<Pick<DrawingOverlay, 'startTime' | 'duration' | 'writeOnSpeed' | 'fadeIn' | 'fadeOut' | 'trackId'>>) => void;
+  addStrokeToDrawingOverlay: (overlayId: string, stroke: DrawingStroke) => void;
+  removeStrokeFromDrawingOverlay: (overlayId: string, strokeId: string) => void;
+  removeDrawingOverlay: (id: string) => void;
+  selectDrawingOverlay: (id: string | null) => void;
+  setActiveDrawingTool: (tool: DrawingToolType) => void;
+  setActiveDrawingColor: (color: string) => void;
+  setActiveDrawingStrokeWidth: (width: number) => void;
+  setActiveDrawingTexture: (texture: DrawingTexture) => void;
+  setActiveDrawingWriteOnSpeed: (speed: number) => void;
+
   // Actions - Tracks
-  addTrack: (type: 'video' | 'audio' | 'text') => string;
+  addTrack: (type: 'video' | 'audio' | 'text' | 'drawing') => string;
   removeTrack: (trackId: string) => void;
   toggleTrackMute: (trackId: string) => void;
   toggleTrackLock: (trackId: string) => void;
@@ -216,6 +242,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         tracks: options?.initialTracks ?? DEFAULT_TRACKS,
         clips: {},
         textOverlays: {},
+        drawingOverlays: {},
         playheadPosition: 0,
         isPlaying: false,
         duration: 0,
@@ -223,7 +250,13 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         snapEnabled: true,
         selectedClipIds: [],
         selectedTextOverlayId: null,
+        selectedDrawingOverlayId: null,
         activeTool: 'select' as Tool,
+        activeDrawingTool: 'pen' as DrawingToolType,
+        activeDrawingColor: '#ff0000',
+        activeDrawingStrokeWidth: 4,
+        activeDrawingTexture: 'solid' as DrawingTexture,
+        activeDrawingWriteOnSpeed: 1,
         transcripts: {},
         activeTranscriptMediaId: null,
         settings: { ...DEFAULT_SETTINGS, ...options?.initialSettings },
@@ -640,11 +673,82 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             if (id) state.selectedClipIds = [];
           }),
 
+        // Drawing Overlays
+        addDrawingOverlay: (trackId, startTime) => {
+          const id = uuid();
+          set((state) => {
+            state.drawingOverlays[id] = {
+              id,
+              trackId,
+              startTime,
+              duration: 5,
+              strokes: [],
+              writeOnSpeed: 1,
+            };
+          });
+          get().recalculateDuration();
+          return id;
+        },
+
+        updateDrawingOverlay: (id, updates) =>
+          set((state) => {
+            const overlay = state.drawingOverlays[id];
+            if (!overlay) return;
+            if (updates.startTime !== undefined) overlay.startTime = updates.startTime;
+            if (updates.duration !== undefined) overlay.duration = updates.duration;
+            if (updates.writeOnSpeed !== undefined) overlay.writeOnSpeed = updates.writeOnSpeed;
+            if (updates.fadeIn !== undefined) overlay.fadeIn = updates.fadeIn;
+            if (updates.fadeOut !== undefined) overlay.fadeOut = updates.fadeOut;
+            if (updates.trackId !== undefined) overlay.trackId = updates.trackId;
+          }),
+
+        addStrokeToDrawingOverlay: (overlayId, stroke) =>
+          set((state) => {
+            const overlay = state.drawingOverlays[overlayId];
+            if (overlay) overlay.strokes.push(stroke);
+          }),
+
+        removeStrokeFromDrawingOverlay: (overlayId, strokeId) =>
+          set((state) => {
+            const overlay = state.drawingOverlays[overlayId];
+            if (overlay) overlay.strokes = overlay.strokes.filter((s) => s.id !== strokeId);
+          }),
+
+        removeDrawingOverlay: (id) =>
+          set((state) => {
+            delete state.drawingOverlays[id];
+            if (state.selectedDrawingOverlayId === id) state.selectedDrawingOverlayId = null;
+          }),
+
+        selectDrawingOverlay: (id) =>
+          set((state) => {
+            state.selectedDrawingOverlayId = id;
+            if (id) {
+              state.selectedClipIds = [];
+              state.selectedTextOverlayId = null;
+            }
+          }),
+
+        setActiveDrawingTool: (tool) =>
+          set((state) => { state.activeDrawingTool = tool; }),
+
+        setActiveDrawingColor: (color) =>
+          set((state) => { state.activeDrawingColor = color; }),
+
+        setActiveDrawingStrokeWidth: (width) =>
+          set((state) => { state.activeDrawingStrokeWidth = width; }),
+
+        setActiveDrawingTexture: (texture) =>
+          set((state) => { state.activeDrawingTexture = texture; }),
+
+        setActiveDrawingWriteOnSpeed: (speed) =>
+          set((state) => { state.activeDrawingWriteOnSpeed = speed; }),
+
         addTrack: (type) => {
           const trackId = uuid();
           set((state) => {
             const trackNum = state.tracks.filter((t) => t.type === type).length + 1;
-            const prefix = type === 'video' ? 'V' : type === 'audio' ? 'A' : 'T';
+            const prefix = type === 'video' ? 'V' : type === 'audio' ? 'A' : type === 'drawing' ? 'D' : 'T';
             const track: Track = {
               id: trackId,
               type,
@@ -674,6 +778,11 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             Object.keys(state.textOverlays).forEach((id) => {
               if (state.textOverlays[id].trackId === trackId) {
                 delete state.textOverlays[id];
+              }
+            });
+            Object.keys(state.drawingOverlays).forEach((id) => {
+              if (state.drawingOverlays[id].trackId === trackId) {
+                delete state.drawingOverlays[id];
               }
             });
           });
@@ -804,13 +913,14 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                   const fillerDuration = region.end - region.start;
 
                   if (regionStartInClip > clip.startTime && regionEndInClip < clipEnd) {
-                    // Interior: filler falls entirely within the clip — split and close gap
+                    // Interior: filler falls entirely within the clip — split and close gap.
+                    // Second half starts at regionStartInClip (gap closed by removing filler duration).
                     const newClipId = uuid();
                     state.clips[newClipId] = {
                       id: newClipId,
                       mediaFileId: clip.mediaFileId,
                       trackId: clip.trackId,
-                      startTime: regionStartInClip - fillerDuration,
+                      startTime: regionStartInClip,
                       duration: clipEnd - regionEndInClip,
                       mediaOffset: clip.mediaOffset + (regionEndInClip - clip.startTime),
                       name: clip.name,
@@ -1066,6 +1176,10 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             points.push(overlay.startTime);
             points.push(overlay.startTime + overlay.duration);
           });
+          Object.values(state.drawingOverlays).forEach((overlay) => {
+            points.push(overlay.startTime);
+            points.push(overlay.startTime + overlay.duration);
+          });
           // Scene boundaries
           Object.values(state.transcripts).forEach((t) => {
             t.scenes.forEach((s) => {
@@ -1085,6 +1199,9 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             Object.values(state.textOverlays).forEach((overlay) => {
               maxEnd = Math.max(maxEnd, overlay.startTime + overlay.duration);
             });
+            Object.values(state.drawingOverlays).forEach((overlay) => {
+              maxEnd = Math.max(maxEnd, overlay.startTime + overlay.duration);
+            });
             state.duration = maxEnd + 5;
           }),
       })),
@@ -1093,6 +1210,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           tracks: state.tracks,
           clips: state.clips,
           textOverlays: state.textOverlays,
+          drawingOverlays: state.drawingOverlays,
           transcripts: state.transcripts,
           mediaFiles: state.mediaFiles,
           settings: state.settings,

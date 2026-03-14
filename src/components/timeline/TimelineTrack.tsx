@@ -1,9 +1,10 @@
 import { useCallback, useState, useRef } from 'react';
-import { Volume2, VolumeX, Lock, Unlock, Eye, EyeOff, Type } from 'lucide-react';
+import { Volume2, VolumeX, Lock, Unlock, Eye, EyeOff, Type, Pencil } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
 import { TimelineClipComponent } from './TimelineClip';
 import { TextOverlayClip } from './TextOverlayClip';
+import { DrawingOverlayClip } from './DrawingOverlayClip';
 import type { Track } from '../../types';
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 export function TimelineTrack({ track }: Props) {
   const clips = useTimelineStore((s) => s.clips);
   const textOverlays = useTimelineStore((s) => s.textOverlays);
+  const drawingOverlays = useTimelineStore((s) => s.drawingOverlays);
   const zoom = useTimelineStore((s) => s.zoom);
   const duration = useTimelineStore((s) => s.duration);
   const activeTool = useTimelineStore((s) => s.activeTool);
@@ -32,26 +34,35 @@ export function TimelineTrack({ track }: Props) {
     .filter((o) => o.trackId === track.id)
     .sort((a, b) => a.startTime - b.startTime);
 
+  const trackDrawingOverlays = Object.values(drawingOverlays)
+    .filter((o) => o.trackId === track.id)
+    .sort((a, b) => a.startTime - b.startTime);
+
   const totalWidth = duration * zoom;
   const isVideo = track.type === 'video';
   const isText = track.type === 'text';
+  const isDrawing = track.type === 'drawing';
 
   const trackColor = isVideo
     ? 'var(--bg-clip-video)'
     : isText
       ? 'var(--filler-highlight)'
-      : 'var(--bg-clip-audio)';
+      : isDrawing
+        ? 'var(--bg-clip-drawing)'
+        : 'var(--bg-clip-audio)';
 
   const bgTint = isVideo
     ? 'rgba(59, 130, 246, 0.05)'
     : isText
       ? 'rgba(245, 158, 11, 0.05)'
-      : 'rgba(34, 197, 94, 0.05)';
+      : isDrawing
+        ? 'rgba(14, 165, 233, 0.05)'
+        : 'rgba(34, 197, 94, 0.05)';
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      if (isText) return; // Text tracks don't accept media drops
+      if (isText || isDrawing) return; // Overlay tracks don't accept media drops
       const mediaFileId = e.dataTransfer.getData('application/x-cutlass-media');
       if (!mediaFileId) return;
 
@@ -100,7 +111,9 @@ export function TimelineTrack({ track }: Props) {
     ? (track.muted ? EyeOff : Eye)
     : isText
       ? (track.muted ? EyeOff : Type)
-      : (track.muted ? VolumeX : Volume2);
+      : isDrawing
+        ? (track.muted ? EyeOff : Pencil)
+        : (track.muted ? VolumeX : Volume2);
 
   return (
     <div className="flex" style={{ height: track.height }}>
@@ -136,7 +149,7 @@ export function TimelineTrack({ track }: Props) {
         </button>
 
         {/* Track volume - click label to toggle slider */}
-        {!isText && (
+        {!isText && !isDrawing && (
           <button
             className="text-xs ml-auto"
             style={{ color: 'var(--text-secondary)', fontSize: 9 }}
@@ -148,7 +161,7 @@ export function TimelineTrack({ track }: Props) {
         )}
 
         {/* Inline volume slider */}
-        {showVolumeSlider && !isText && (
+        {showVolumeSlider && !isText && !isDrawing && (
           <input
             type="range"
             min={0}
@@ -183,6 +196,11 @@ export function TimelineTrack({ track }: Props) {
         {/* Text overlays */}
         {trackTextOverlays.map((overlay) => (
           <TextOverlayClip key={overlay.id} overlay={overlay} />
+        ))}
+
+        {/* Drawing overlays */}
+        {trackDrawingOverlays.map((overlay) => (
+          <DrawingOverlayClip key={overlay.id} overlay={overlay} />
         ))}
 
         {/* Inline text input for new overlay (replaces browser prompt) */}
