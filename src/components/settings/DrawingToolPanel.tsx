@@ -45,12 +45,12 @@ export function DrawingToolPanel() {
       {/* Tool selector */}
       <div className="mb-2">
         <label className="text-xs block mb-1" style={{ color: 'var(--text-secondary)' }}>Tool</label>
-        <div className="flex gap-1">
+        <div className="grid grid-cols-2 gap-1">
           {TOOLS.map(({ type, icon: Icon, label }) => (
             <button
               key={type}
               onClick={() => setActiveDrawingTool(type)}
-              className="flex-1 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded text-xs transition-colors"
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-colors"
               style={{
                 background: activeDrawingTool === type ? 'var(--bg-clip-drawing)' : 'var(--bg-surface)',
                 color: activeDrawingTool === type ? 'white' : 'var(--text-secondary)',
@@ -58,7 +58,7 @@ export function DrawingToolPanel() {
               title={label}
             >
               <Icon size={12} />
-              <span style={{ fontSize: '0.6rem' }}>{label}</span>
+              <span>{label}</span>
             </button>
           ))}
         </div>

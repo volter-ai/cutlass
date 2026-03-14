@@ -202,10 +202,11 @@ export function Viewer() {
 
   const fontScale = displayWidth / resolution.width;
 
-  /** Compute write-on reveal fraction (0–1) for a drawing overlay at elapsed seconds */
+  /** Compute write-on reveal fraction (0–1) for a drawing overlay at elapsed seconds.
+   *  Each stroke gets ~1s at 1× speed; writeOnSpeed scales it (2× = faster, 0.5× = slower). */
   function computeRevealFraction(overlay: DrawingOverlay, elapsed: number): number {
     if (elapsed <= 0) return 0;
-    const totalDuration = Math.max(0.5, overlay.strokes.length * 0.3 / (overlay.writeOnSpeed ?? 1));
+    const totalDuration = Math.max(1.0, overlay.strokes.length * 1.0 / (overlay.writeOnSpeed ?? 1));
     return Math.min(1, elapsed / totalDuration);
   }
 
@@ -401,8 +402,9 @@ export function Viewer() {
             );
           })}
 
-          {/* Drawing overlays SVG layer (playback read-only) */}
-          {activeDrawingOverlays.length > 0 && activeTool !== 'draw' && (
+          {/* Drawing overlays SVG layer — shown when not in draw mode, OR when playing.
+               During playback, this takes over from DrawingCanvas so write-on animates. */}
+          {activeDrawingOverlays.length > 0 && (activeTool !== 'draw' || isPlaying) && (
             <svg
               style={{
                 position: 'absolute',
@@ -440,8 +442,9 @@ export function Viewer() {
             </svg>
           )}
 
-          {/* Interactive drawing canvas (draw mode only) */}
-          {activeTool === 'draw' && (
+          {/* Interactive drawing canvas — draw mode only, hidden during playback
+               so the animated SVG overlay shows write-on instead */}
+          {activeTool === 'draw' && !isPlaying && (
             <DrawingCanvas
               width={displayWidth}
               height={displayHeight}
