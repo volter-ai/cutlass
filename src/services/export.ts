@@ -1,7 +1,7 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import type { TimelineState } from '../store/timeline';
-import type { ExportSettings, TimelineClip } from '../types';
+import type { ExportSettings, TimelineClip, DrawingOverlay } from '../types';
 import { track } from './analytics';
 
 /** Convert CSS color notation to FFmpeg color format.
@@ -73,6 +73,98 @@ async function getFFmpeg(onProgress: (progress: number) => void): Promise<FFmpeg
   return ffmpeg;
 }
 
+/** Render all strokes of a DrawingOverlay onto an OffscreenCanvas and return a PNG Uint8Array.
+ *  Used for static burn-in during export (v1 — write-on animation is preview-only). */
+async function renderDrawingOverlayToPng(
+  overlay: DrawingOverlay,
+  width: number,
+  height: number,
+): Promise<Uint8Array> {
+  const offscreen = new OffscreenCanvas(width, height);
+  const ctx = offscreen.getContext('2d')!;
+  ctx.clearRect(0, 0, width, height);
+
+  for (const stroke of overlay.strokes) {
+    const { tool, points, color, strokeWidth, opacity, texture } = stroke;
+    if (points.length < 1) continue;
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = strokeWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (texture === 'marker') {
+      ctx.globalAlpha = 0.5;
+      ctx.lineCap = 'square';
+    } else {
+      ctx.globalAlpha = opacity;
+    }
+
+    if (tool === 'pen') {
+      if (points.length < 2) { ctx.restore(); continue; }
+      ctx.beginPath();
+      ctx.moveTo(points[0].x * width, points[0].y * height);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x * width, points[i].y * height);
+      }
+      if (texture === 'chalk') {
+        ctx.stroke();
+        ctx.globalAlpha *= 0.35;
+        ctx.lineWidth += 1;
+        ctx.stroke();
+        ctx.stroke();
+      } else {
+        ctx.stroke();
+      }
+    } else if (tool === 'arrow') {
+      if (points.length < 2) { ctx.restore(); continue; }
+      const p0 = points[0];
+      const p1 = points[points.length - 1];
+      const x0 = p0.x * width, y0 = p0.y * height;
+      const x1 = p1.x * width, y1 = p1.y * height;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+      const angle = Math.atan2(y1 - y0, x1 - x0);
+      const size = Math.max(10, strokeWidth * 4);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x1 - size * Math.cos(angle - Math.PI / 6), y1 - size * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(x1 - size * Math.cos(angle + Math.PI / 6), y1 - size * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+    } else if (tool === 'circle') {
+      if (points.length < 2) { ctx.restore(); continue; }
+      const cx = points[0].x * width;
+      const cy = points[0].y * height;
+      const ex = points[points.length - 1].x * width;
+      const ey = points[points.length - 1].y * height;
+      const rx = Math.abs(ex - cx);
+      const ry = Math.abs(ey - cy);
+      if (rx < 1 || ry < 1) { ctx.restore(); continue; }
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
+      ctx.stroke();
+    } else if (tool === 'rectangle') {
+      if (points.length < 2) { ctx.restore(); continue; }
+      const x1 = points[0].x * width;
+      const y1 = points[0].y * height;
+      const x2 = points[points.length - 1].x * width;
+      const y2 = points[points.length - 1].y * height;
+      ctx.strokeRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+    }
+
+    ctx.restore();
+  }
+
+  const blob = await offscreen.convertToBlob({ type: 'image/png' });
+  const ab = await blob.arrayBuffer();
+  return new Uint8Array(ab);
+}
+
 export async function exportTimeline(
   state: TimelineState,
   settings: ExportSettings,
@@ -83,6 +175,7 @@ export async function exportTimeline(
   onProgress(5);
 
   const { clips, mediaFiles, tracks, textOverlays, transcripts } = state;
+  const drawingOverlays = state.drawingOverlays ?? {};
   const { resolution, frameRate, backgroundColor } = state.settings;
 
   // Collect all media files used by clips
@@ -197,6 +290,9 @@ export async function exportTimeline(
   Object.values(textOverlays).forEach((o) => {
     timelineDuration = Math.max(timelineDuration, o.startTime + o.duration);
   });
+  Object.values(drawingOverlays).forEach((o) => {
+    timelineDuration = Math.max(timelineDuration, o.startTime + o.duration);
+  });
   if (timelineDuration === 0) {
     throw new Error('Nothing to export - timeline is empty');
   }
@@ -212,12 +308,30 @@ export async function exportTimeline(
   });
   const exportStartMs = Date.now();
 
+  // Render drawing overlay PNGs for export (static burn-in; write-on is preview-only in v1)
+  const drawingPngFiles: { filename: string; overlay: DrawingOverlay; inputIdx: number }[] = [];
+  const drawingOverlaysList = Object.values(drawingOverlays).filter((o) => o.strokes.length > 0);
+  for (let i = 0; i < drawingOverlaysList.length; i++) {
+    const overlay = drawingOverlaysList[i];
+    try {
+      const pngData = await renderDrawingOverlayToPng(overlay, resolution.width, resolution.height);
+      const filename = `drawing_${i}.png`;
+      await ff.writeFile(filename, pngData);
+      drawingPngFiles.push({ filename, overlay, inputIdx: inputFiles.length + i });
+    } catch { /* skip overlay if rendering fails */ }
+  }
+
   // Build ffmpeg command
   const args: string[] = [];
 
-  // Input files
+  // Input files (media)
   for (const filename of inputFiles) {
     args.push('-i', filename);
+  }
+
+  // Drawing PNG inputs (-loop 1 = static image looped for its overlay duration)
+  for (const dpf of drawingPngFiles) {
+    args.push('-loop', '1', '-i', dpf.filename);
   }
 
   // Create background canvas with user-selected color
@@ -226,7 +340,7 @@ export async function exportTimeline(
     '-f', 'lavfi',
     '-i', `color=c=${bgColor}:s=${resolution.width}x${resolution.height}:r=${frameRate}:d=${timelineDuration}`,
   );
-  const canvasIdx = inputFiles.length;
+  const canvasIdx = inputFiles.length + drawingPngFiles.length;
 
   // Build filter complex
   const filterParts: string[] = [];
@@ -453,6 +567,14 @@ export async function exportTimeline(
     overlayLabel = `[${outLabel}]`;
   });
 
+  // Drawing overlay filter entries (PNG burn-in)
+  drawingPngFiles.forEach(({ overlay, inputIdx }, i) => {
+    const outLabel = `drw${i}`;
+    const enableExpr = `between(t,${overlay.startTime},${overlay.startTime + overlay.duration})`;
+    filterParts.push(`${overlayLabel}[${inputIdx}:v]overlay=0:0:enable='${enableExpr}'[${outLabel}]`);
+    overlayLabel = `[${outLabel}]`;
+  });
+
   // Audio mixing with fades and track volume
   let audioFilterLabel = '';
   if (settings.includeAudio && audioClips.length > 0) {
@@ -561,6 +683,9 @@ export async function exportTimeline(
     // so stale files don't persist into the next export attempt.
     for (const filename of inputFiles) {
       try { await ff.deleteFile(filename); } catch { /* ignore */ }
+    }
+    for (const dpf of drawingPngFiles) {
+      try { await ff.deleteFile(dpf.filename); } catch { /* ignore */ }
     }
     try { await ff.deleteFile(fontPath); } catch { /* ignore */ }
     try { await ff.deleteFile(outputFile); } catch { /* ignore */ }

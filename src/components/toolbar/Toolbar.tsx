@@ -6,6 +6,7 @@ import {
   MousePointer2,
   Scissors,
   Type,
+  Pen,
   Undo2,
   Redo2,
   ZoomIn,
@@ -54,6 +55,7 @@ export function Toolbar() {
     { tool: 'select', icon: MousePointer2, label: t.toolbar.select, shortcut: 'V' },
     { tool: 'razor', icon: Scissors, label: t.toolbar.razor, shortcut: 'C' },
     { tool: 'text', icon: Type, label: t.toolbar.text, shortcut: 'T' },
+    { tool: 'draw', icon: Pen, label: 'Draw', shortcut: 'D' },
   ];
 
   return (

@@ -76,7 +76,7 @@ export interface Transition {
 
 export interface Track {
   id: string;
-  type: 'video' | 'audio' | 'text';
+  type: 'video' | 'audio' | 'text' | 'drawing';
   name: string;
   muted: boolean;
   locked: boolean;
@@ -110,6 +110,45 @@ export interface TextStyle {
   textAlign: 'left' | 'center' | 'right';
   outline: boolean;
   outlineColor: string;
+}
+
+export type DrawingToolType = 'pen' | 'arrow' | 'circle' | 'rectangle';
+
+export type DrawingTexture = 'solid' | 'marker' | 'chalk';
+
+export interface DrawingPoint {
+  x: number; // normalized 0–1 (relative to canvas width)
+  y: number; // normalized 0–1 (relative to canvas height)
+}
+
+/** A single drawn stroke or shape.
+ *  points interpretation by tool:
+ *   pen:       polyline — all captured pointer positions
+ *   arrow:     exactly 2 points [start, end]
+ *   circle:    exactly 2 points [center, edge] — radius = distance
+ *   rectangle: exactly 2 points [topLeft, bottomRight]
+ */
+export interface DrawingStroke {
+  id: string;
+  tool: DrawingToolType;
+  texture: DrawingTexture;
+  color: string;         // CSS hex e.g. '#ff0000'
+  strokeWidth: number;   // pixels at 1920px canvas width; scale proportionally
+  opacity: number;       // baked in at creation: solid=1, marker=0.5, chalk=0.7
+  points: DrawingPoint[];
+}
+
+/** A timed drawing layer — mirrors TextOverlay structurally */
+export interface DrawingOverlay {
+  id: string;
+  trackId: string;
+  startTime: number;
+  duration: number;
+  strokes: DrawingStroke[];
+  /** Write-on animation speed multiplier: 0.5=slow, 1=normal, 2=fast (preview-only in v1) */
+  writeOnSpeed: number;
+  fadeIn?: number;
+  fadeOut?: number;
 }
 
 export interface CaptionStyle {
@@ -174,7 +213,7 @@ export interface Transcript {
   scenes: Scene[];
 }
 
-export type Tool = 'select' | 'razor' | 'trim' | 'text';
+export type Tool = 'select' | 'razor' | 'trim' | 'text' | 'draw';
 
 export type FillerRemovalMode = 'delete' | 'gap' | 'ignore' | 'transcript-only';
 

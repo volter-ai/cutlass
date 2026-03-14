@@ -2,7 +2,9 @@ import { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { Maximize2 } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
-import type { AnimationPreset } from '../../types';
+import { DrawingCanvas } from './DrawingCanvas';
+import { DrawingStrokeRenderer } from './DrawingStrokeRenderer';
+import type { AnimationPreset, DrawingOverlay } from '../../types';
 
 /** Compute fade volume multiplier (0–1) for a clip at the given playhead position */
 function computeVideoFadeMultiplier(clip: { startTime: number; duration: number; fadeIn: number; fadeOut: number }, playheadPosition: number): number {
@@ -92,6 +94,10 @@ export function Viewer() {
   const tracks = useTimelineStore((s) => s.tracks);
   const mediaFiles = useTimelineStore((s) => s.mediaFiles);
   const textOverlays = useTimelineStore((s) => s.textOverlays);
+  const drawingOverlays = useTimelineStore((s) => s.drawingOverlays);
+  const activeTool = useTimelineStore((s) => s.activeTool);
+  const selectedDrawingOverlayId = useTimelineStore((s) => s.selectedDrawingOverlayId);
+  const { addDrawingOverlay, addTrack, selectDrawingOverlay } = useTimelineStore();
   const resolution = useTimelineStore((s) => s.settings.resolution);
   const backgroundColor = useTimelineStore((s) => s.settings.backgroundColor ?? '#000000');
   const { t } = useLanguage();
@@ -187,7 +193,47 @@ export function Viewer() {
     );
   }, [textOverlays, playheadPosition]);
 
+  // Drawing overlays active at current playhead
+  const activeDrawingOverlays = useMemo(() => {
+    return Object.values(drawingOverlays).filter(
+      (o) => playheadPosition >= o.startTime && playheadPosition < o.startTime + o.duration,
+    );
+  }, [drawingOverlays, playheadPosition]);
+
   const fontScale = displayWidth / resolution.width;
+
+  /** Compute write-on reveal fraction (0–1) for a drawing overlay at elapsed seconds */
+  function computeRevealFraction(overlay: DrawingOverlay, elapsed: number): number {
+    if (elapsed <= 0) return 0;
+    const totalDuration = Math.max(0.5, overlay.strokes.length * 0.3 / (overlay.writeOnSpeed ?? 1));
+    return Math.min(1, elapsed / totalDuration);
+  }
+
+  /** Compute fade opacity for drawing/text overlays */
+  function computeOverlayOpacity(overlay: { startTime: number; duration: number; fadeIn?: number; fadeOut?: number }): number {
+    const elapsed = playheadPosition - overlay.startTime;
+    const remaining = overlay.startTime + overlay.duration - playheadPosition;
+    let opacity = 1;
+    if (overlay.fadeIn && overlay.fadeIn > 0 && elapsed < overlay.fadeIn) {
+      opacity = Math.max(0, elapsed / overlay.fadeIn);
+    }
+    if (overlay.fadeOut && overlay.fadeOut > 0 && remaining < overlay.fadeOut) {
+      opacity = Math.min(opacity, Math.max(0, remaining / overlay.fadeOut));
+    }
+    return opacity;
+  }
+
+  /** Called by DrawingCanvas when no overlay is active — creates one automatically */
+  const handleNeedOverlay = useCallback((): string => {
+    // Find or create a drawing track
+    let drawingTrackId = tracks.find((t) => t.type === 'drawing')?.id;
+    if (!drawingTrackId) {
+      drawingTrackId = addTrack('drawing');
+    }
+    const newId = addDrawingOverlay(drawingTrackId, playheadPosition);
+    selectDrawingOverlay(newId);
+    return newId;
+  }, [tracks, addTrack, addDrawingOverlay, selectDrawingOverlay, playheadPosition]);
 
   // Sync video element with playhead
   useEffect(() => {
@@ -325,16 +371,7 @@ export function Viewer() {
 
           {/* Text overlays */}
           {activeTextOverlays.map((overlay) => {
-            // Compute fade opacity for this overlay
-            const elapsed = playheadPosition - overlay.startTime;
-            const remaining = overlay.startTime + overlay.duration - playheadPosition;
-            let textOpacity = 1;
-            if (overlay.fadeIn && overlay.fadeIn > 0 && elapsed < overlay.fadeIn) {
-              textOpacity = Math.max(0, elapsed / overlay.fadeIn);
-            }
-            if (overlay.fadeOut && overlay.fadeOut > 0 && remaining < overlay.fadeOut) {
-              textOpacity = Math.min(textOpacity, Math.max(0, remaining / overlay.fadeOut));
-            }
+            const textOpacity = computeOverlayOpacity(overlay);
             return (
               <div
                 key={overlay.id}
@@ -363,6 +400,55 @@ export function Viewer() {
               </div>
             );
           })}
+
+          {/* Drawing overlays SVG layer (playback read-only) */}
+          {activeDrawingOverlays.length > 0 && activeTool !== 'draw' && (
+            <svg
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+                zIndex: 15,
+              }}
+            >
+              <defs>
+                <filter id="cutlass-chalk-filter" x="-5%" y="-5%" width="110%" height="110%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" result="noise" />
+                  <feDisplacementMap in="SourceGraphic" in2="noise" scale="2" xChannelSelector="R" yChannelSelector="G" />
+                </filter>
+              </defs>
+              {activeDrawingOverlays.map((overlay) => {
+                const elapsed = playheadPosition - overlay.startTime;
+                const revealFraction = computeRevealFraction(overlay, elapsed);
+                const drawOpacity = computeOverlayOpacity(overlay);
+                return (
+                  <g key={overlay.id} opacity={drawOpacity}>
+                    {overlay.strokes.map((stroke) => (
+                      <DrawingStrokeRenderer
+                        key={stroke.id}
+                        stroke={stroke}
+                        canvasWidth={displayWidth}
+                        canvasHeight={displayHeight}
+                        revealFraction={revealFraction}
+                      />
+                    ))}
+                  </g>
+                );
+              })}
+            </svg>
+          )}
+
+          {/* Interactive drawing canvas (draw mode only) */}
+          {activeTool === 'draw' && (
+            <DrawingCanvas
+              width={displayWidth}
+              height={displayHeight}
+              activeOverlayId={selectedDrawingOverlayId}
+              onNeedOverlay={handleNeedOverlay}
+            />
+          )}
         </div>
       </div>
     </div>
