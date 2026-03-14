@@ -4,6 +4,7 @@ import { temporal } from 'zundo';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
 import { ASPECT_RATIO_DIMENSIONS } from '../types';
+import { track } from '../services/analytics';
 import type {
   MediaFile,
   TimelineClip,
@@ -244,6 +245,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           import('../services/mediaStorage').then((ms) =>
             ms.storeMediaFile(file.id, file.file).catch(() => {}),
           );
+          track('media.imported', { type: file.type, durationSeconds: file.duration, hasAudio: file.hasAudio });
         },
 
         removeMediaFile: (id) => {
@@ -370,7 +372,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             clip.fadeOut = Math.min(clip.fadeOut, clip.duration / 2);
           }),
 
-        splitClipAtPlayhead: (clipId) =>
+        splitClipAtPlayhead: (clipId) => {
           set((state) => {
             const clip = state.clips[clipId];
             if (!clip) return;
@@ -404,7 +406,9 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
 
             clip.duration = splitPoint;
             clip.fadeOut = 0;
-          }),
+          });
+          track('feature.used', { feature: 'split' });
+        },
 
         rippleDelete: (clipId) => {
           set((state) => {
@@ -576,6 +580,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           });
 
           get().recalculateDuration();
+          track('feature.used', { feature: 'extractAudio' });
           return audioClipId;
         },
 
@@ -606,6 +611,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             };
           });
           get().recalculateDuration();
+          track('feature.used', { feature: 'addTextOverlay' });
           return id;
         },
 
@@ -738,10 +744,12 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             state.selectedClipIds = clipIds;
           }),
 
-        setActiveTool: (tool) =>
+        setActiveTool: (tool) => {
           set((state) => {
             state.activeTool = tool;
-          }),
+          });
+          track('tool.changed', { tool });
+        },
 
         setTranscript: (mediaFileId, transcript) =>
           set((state) => {

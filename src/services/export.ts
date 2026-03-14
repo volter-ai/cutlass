@@ -2,6 +2,7 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import type { TimelineState } from '../store/timeline';
 import type { ExportSettings, TimelineClip } from '../types';
+import { track } from './analytics';
 
 /** Escape a string for use inside FFmpeg drawtext's text='...' option.
  *  Order matters: backslash must be escaped first. */
@@ -152,6 +153,17 @@ export async function exportTimeline(
   if (timelineDuration === 0) {
     throw new Error('Nothing to export - timeline is empty');
   }
+
+  track('export.started', {
+    format: settings.format,
+    quality: settings.quality,
+    includeAudio: settings.includeAudio,
+    burnCaptions: settings.burnCaptions,
+    clipCount: Object.keys(clips).length,
+    textOverlayCount: Object.keys(textOverlays).length,
+    durationSeconds: timelineDuration,
+  });
+  const exportStartMs = Date.now();
 
   // Build ffmpeg command
   const args: string[] = [];
@@ -450,6 +462,12 @@ export async function exportTimeline(
   const exitCode = await ff.exec(args);
   if (exitCode !== 0) {
     console.error('[Export] FFmpeg failed (code', exitCode, '). Full args:', args);
+    track('export.failed', {
+      format: settings.format,
+      quality: settings.quality,
+      exitCode,
+      filterComplex: fcIdx >= 0 ? args[fcIdx + 1] : undefined,
+    });
     throw new Error(`FFmpeg exited with code ${exitCode}. Check browser console for details.`);
   }
 
@@ -458,6 +476,12 @@ export async function exportTimeline(
   const data = await ff.readFile(outputFile);
   const mimeType = settings.format === 'mp4' ? 'video/mp4' : 'video/webm';
   const blob = new Blob([data as BlobPart], { type: mimeType });
+  track('export.completed', {
+    format: settings.format,
+    quality: settings.quality,
+    elapsedMs: Date.now() - exportStartMs,
+    blobSizeBytes: blob.size,
+  });
 
   // Cleanup
   for (const filename of inputFiles) {
