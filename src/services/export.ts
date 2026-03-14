@@ -4,6 +4,21 @@ import type { TimelineState } from '../store/timeline';
 import type { ExportSettings, TimelineClip } from '../types';
 import { track } from './analytics';
 
+/** Convert CSS color notation to FFmpeg color format.
+ *  FFmpeg drawtext boxcolor accepts #RRGGBB, #RRGGBBAA, and named colors,
+ *  but NOT CSS rgba() / rgb() notation. */
+function cssColorToFFmpeg(color: string): string {
+  const m = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/);
+  if (!m) return color; // already hex or named color — pass through
+  const r = parseInt(m[1], 10).toString(16).padStart(2, '0');
+  const g = parseInt(m[2], 10).toString(16).padStart(2, '0');
+  const b = parseInt(m[3], 10).toString(16).padStart(2, '0');
+  const a = m[4] !== undefined
+    ? Math.round(parseFloat(m[4]) * 255).toString(16).padStart(2, '0')
+    : 'ff';
+  return `#${r}${g}${b}${a}`;
+}
+
 /** Escape a string for use inside FFmpeg drawtext's text='...' option.
  *  Order matters: backslash must be escaped first. */
 function escapeDrawtext(s: string): string {
@@ -111,15 +126,27 @@ export async function exportTimeline(
   // stream. Browser-side detection (audioTracks API) is unreliable across browsers — e.g.
   // Firefox doesn't support audioTracks and we'd fall back to hasAudio=true for every file,
   // generating [N:a] filter references that crash FFmpeg when the file is video-only.
+  //
+  // Use a dedicated per-probe log listener instead of the shared ring buffer. The ring buffer
+  // approach has a race condition: log events from probing a previous file (e.g. a WAV with
+  // "Audio:") can remain queued in the JS event loop and fire after ffmpegLogs.length=0,
+  // contaminating the next probe's results and causing video-only files to be misidentified
+  // as having audio — producing [N:a] filter references that don't exist → exit code 1.
   const inputHasAudio = new Map<number, boolean>();
   for (const [mediaId, filename] of mediaFileMap) {
     const idx = inputIdxMap.get(mediaId);
     if (idx === undefined) continue;
-    ffmpegLogs.length = 0;
+    let hasAudio = false;
+    const probeHandler = ({ message }: { type: string; message: string }) => {
+      if (message.includes('Audio:')) hasAudio = true;
+    };
+    ff.on('log', probeHandler);
     await ff.exec(['-i', filename]); // exits code 1 (no output file) — we only need the log
-    inputHasAudio.set(idx, ffmpegLogs.some((l) => l.includes('Audio:')));
+    // Flush any remaining queued log events before detaching the listener
+    await new Promise<void>((r) => setTimeout(r, 0));
+    ff.off('log', probeHandler);
+    inputHasAudio.set(idx, hasAudio);
   }
-  ffmpegLogs.length = 0; // clear probe logs so only the main export logs are captured
 
   // Sort clips by track priority (higher video tracks overlay lower)
   const videoClips: (TimelineClip & { inputIdx: number })[] = [];
@@ -395,7 +422,7 @@ export async function exportTimeline(
           const escapedText = escapeDrawtext(text);
           const capLabel = `cap${captionIdx}`;
           filterParts.push(
-            `${overlayLabel}drawtext=fontfile=${fontPath}:text='${escapedText}':fontsize=${captionStyle.fontSize}:fontcolor=${captionStyle.color}:x=(w-tw)/2:y=${yPos}:enable='between(t,${start},${end})':box=1:boxcolor=${captionStyle.backgroundColor.replace(/,/g, '\\,')}:boxborderw=8[${capLabel}]`,
+            `${overlayLabel}drawtext=fontfile=${fontPath}:text='${escapedText}':fontsize=${captionStyle.fontSize}:fontcolor=${captionStyle.color}:x=(w-tw)/2:y=${yPos}:enable='between(t,${start},${end})':box=1:boxcolor=${cssColorToFFmpeg(captionStyle.backgroundColor)}:boxborderw=8[${capLabel}]`,
           );
           overlayLabel = `[${capLabel}]`;
           captionIdx++;
@@ -418,7 +445,7 @@ export async function exportTimeline(
       drawtext += `:borderw=2:bordercolor=${overlay.style.outlineColor}`;
     }
     if (overlay.style.backgroundColor !== 'transparent') {
-      drawtext += `:box=1:boxcolor=${overlay.style.backgroundColor.replace(/,/g, '\\,')}:boxborderw=6`;
+      drawtext += `:box=1:boxcolor=${cssColorToFFmpeg(overlay.style.backgroundColor)}:boxborderw=6`;
     }
 
     const outLabel = `txt${i}`;
@@ -501,39 +528,43 @@ export async function exportTimeline(
   const fcIdx = args.indexOf('-filter_complex');
   if (fcIdx >= 0) console.log('[Export] filter_complex:', args[fcIdx + 1]);
 
-  const exitCode = await ff.exec(args);
-  if (exitCode !== 0) {
-    console.error('[Export] FFmpeg failed (code', exitCode, '). Full args:', args);
-    track('export.failed', {
+  try {
+    const exitCode = await ff.exec(args);
+    if (exitCode !== 0) {
+      console.error('[Export] FFmpeg failed (code', exitCode, '). Full args:', args);
+      track('export.failed', {
+        format: settings.format,
+        quality: settings.quality,
+        exitCode,
+        filterComplex: fcIdx >= 0 ? args[fcIdx + 1] : undefined,
+        ffmpegLog: ffmpegLogs.slice(-40).join('\n'),
+      });
+      throw new Error(`FFmpeg exited with code ${exitCode}. Check browser console for details.`);
+    }
+
+    onProgress(95);
+
+    const data = await ff.readFile(outputFile);
+    const mimeType = settings.format === 'mp4' ? 'video/mp4' : 'video/webm';
+    const blob = new Blob([data as BlobPart], { type: mimeType });
+    track('export.completed', {
       format: settings.format,
       quality: settings.quality,
-      exitCode,
-      filterComplex: fcIdx >= 0 ? args[fcIdx + 1] : undefined,
-      ffmpegLog: ffmpegLogs.slice(-40).join('\n'),
+      elapsedMs: Date.now() - exportStartMs,
+      blobSizeBytes: blob.size,
     });
-    throw new Error(`FFmpeg exited with code ${exitCode}. Check browser console for details.`);
+
+    onProgress(100);
+    return blob;
+  } finally {
+    // Always clean up WASM virtual FS regardless of success or failure,
+    // so stale files don't persist into the next export attempt.
+    for (const filename of inputFiles) {
+      try { await ff.deleteFile(filename); } catch { /* ignore */ }
+    }
+    try { await ff.deleteFile(fontPath); } catch { /* ignore */ }
+    try { await ff.deleteFile(outputFile); } catch { /* ignore */ }
   }
-
-  onProgress(95);
-
-  const data = await ff.readFile(outputFile);
-  const mimeType = settings.format === 'mp4' ? 'video/mp4' : 'video/webm';
-  const blob = new Blob([data as BlobPart], { type: mimeType });
-  track('export.completed', {
-    format: settings.format,
-    quality: settings.quality,
-    elapsedMs: Date.now() - exportStartMs,
-    blobSizeBytes: blob.size,
-  });
-
-  // Cleanup
-  for (const filename of inputFiles) {
-    await ff.deleteFile(filename);
-  }
-  await ff.deleteFile(outputFile);
-
-  onProgress(100);
-  return blob;
 }
 
 export function downloadBlob(blob: Blob, filename: string) {

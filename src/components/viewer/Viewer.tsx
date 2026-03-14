@@ -114,20 +114,28 @@ export function Viewer() {
   const displayWidth = Math.min(videoAreaSize.width, videoAreaSize.height * ar);
   const displayHeight = displayWidth / ar;
 
-  // Find the active video clip at the current playhead position (video type only)
+  // Find the active video clip at the current playhead position (video type only).
+  // When clips on multiple video tracks overlap, pick the one from the highest-index
+  // track — that is the top rendered layer, consistent with the export sort order.
   const activeClip = useMemo(() => {
     const videoTrackIds = new Set(
       tracks.filter((t) => t.type === 'video').map((t) => t.id),
     );
-    return (
-      Object.values(clips).find(
-        (c) =>
-          c.type === 'video' &&
-          videoTrackIds.has(c.trackId) &&
-          playheadPosition >= c.startTime &&
-          playheadPosition < c.startTime + c.duration,
-      ) ?? null
+    const candidates = Object.values(clips).filter(
+      (c) =>
+        c.type === 'video' &&
+        videoTrackIds.has(c.trackId) &&
+        playheadPosition >= c.startTime &&
+        playheadPosition < c.startTime + c.duration,
     );
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) return candidates[0];
+    // Return the clip whose track has the highest index (rendered last = on top in export)
+    return candidates.reduce((best, clip) => {
+      const clipIdx = tracks.findIndex((t) => t.id === clip.trackId);
+      const bestIdx = tracks.findIndex((t) => t.id === best.trackId);
+      return clipIdx > bestIdx ? clip : best;
+    });
   }, [tracks, clips, playheadPosition]);
 
   // Image clips active at the current playhead (rendered as overlays on top of video)

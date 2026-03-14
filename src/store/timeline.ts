@@ -810,7 +810,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                       id: newClipId,
                       mediaFileId: clip.mediaFileId,
                       trackId: clip.trackId,
-                      startTime: regionStartInClip - fillerDuration,
+                      startTime: regionStartInClip,
                       duration: clipEnd - regionEndInClip,
                       mediaOffset: clip.mediaOffset + (regionEndInClip - clip.startTime),
                       name: clip.name,
