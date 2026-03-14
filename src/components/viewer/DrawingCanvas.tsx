@@ -20,7 +20,6 @@ export function DrawingCanvas({ width, height, activeOverlayId, onNeedOverlay }:
   const activeDrawingColor = useTimelineStore((s) => s.activeDrawingColor);
   const activeDrawingStrokeWidth = useTimelineStore((s) => s.activeDrawingStrokeWidth);
   const activeDrawingTexture = useTimelineStore((s) => s.activeDrawingTexture);
-  const activeDrawingWriteOnSpeed = useTimelineStore((s) => s.activeDrawingWriteOnSpeed);
   const { addStrokeToDrawingOverlay } = useTimelineStore();
 
   // In-progress stroke points (not yet committed to store)
@@ -72,7 +71,7 @@ export function DrawingCanvas({ width, height, activeOverlayId, onNeedOverlay }:
   );
 
   const handlePointerUp = useCallback(
-    (e: React.PointerEvent<SVGSVGElement>) => {
+    (_e: React.PointerEvent<SVGSVGElement>) => {
       if (inProgressPoints.length < 1) return;
 
       // Ensure we have an overlay to attach to
