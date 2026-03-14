@@ -350,6 +350,15 @@ export async function exportTimeline(
       clipLabel = foLabel;
     }
 
+    // Shift PTS to timeline position so the overlay filter receives the correct frames.
+    // FFmpeg's overlay consumes both inputs simultaneously from t=0; without this offset,
+    // clip frames are consumed before the enable expression activates, causing the clip to
+    // appear frozen at its last frame. Shifting PTS by startTime/TB makes frames "available"
+    // in the filter graph only at the correct output time.
+    const ptLabel = `vt${i}`;
+    filterParts.push(`[${clipLabel}]setpts=PTS+${clip.startTime}/TB[${ptLabel}]`);
+    clipLabel = ptLabel;
+
     // Overlay with enable timing
     const outLabel = `ov${i}`;
     const enableExpr = `between(t,${clip.startTime},${clip.startTime + clip.duration})`;
