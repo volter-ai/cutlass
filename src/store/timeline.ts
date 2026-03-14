@@ -801,8 +801,6 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                   const clipEnd = clip.startTime + clip.duration;
                   const regionStartInClip = region.start - clip.mediaOffset + clip.startTime;
                   const regionEndInClip = region.end - clip.mediaOffset + clip.startTime;
-                  const fillerDuration = region.end - region.start;
-
                   if (regionStartInClip > clip.startTime && regionEndInClip < clipEnd) {
                     // Interior: filler falls entirely within the clip — split and close gap
                     const newClipId = uuid();
