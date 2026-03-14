@@ -98,10 +98,6 @@ export async function exportTimeline(
 
   onProgress(15);
 
-  // Sort clips by track priority (higher video tracks overlay lower)
-  const videoClips: (TimelineClip & { inputIdx: number })[] = [];
-  const audioClips: (TimelineClip & { inputIdx: number })[] = [];
-
   // Map input files to ffmpeg input indices
   const inputFiles: string[] = [];
   const inputIdxMap = new Map<string, number>();
@@ -110,6 +106,24 @@ export async function exportTimeline(
     inputIdxMap.set(mediaId, inputFiles.length);
     inputFiles.push(filename);
   }
+
+  // Probe each input file with FFmpeg to definitively determine whether it has an audio
+  // stream. Browser-side detection (audioTracks API) is unreliable across browsers — e.g.
+  // Firefox doesn't support audioTracks and we'd fall back to hasAudio=true for every file,
+  // generating [N:a] filter references that crash FFmpeg when the file is video-only.
+  const inputHasAudio = new Map<number, boolean>();
+  for (const [mediaId, filename] of mediaFileMap) {
+    const idx = inputIdxMap.get(mediaId);
+    if (idx === undefined) continue;
+    ffmpegLogs.length = 0;
+    await ff.exec(['-i', filename]); // exits code 1 (no output file) — we only need the log
+    inputHasAudio.set(idx, ffmpegLogs.some((l) => l.includes('Audio:')));
+  }
+  ffmpegLogs.length = 0; // clear probe logs so only the main export logs are captured
+
+  // Sort clips by track priority (higher video tracks overlay lower)
+  const videoClips: (TimelineClip & { inputIdx: number })[] = [];
+  const audioClips: (TimelineClip & { inputIdx: number })[] = [];
 
   // Build set of linkedGroupIds that have a dedicated audio clip on an audio track,
   // so the paired video clip doesn't produce double audio (mirrors useAudioPlayback logic).
@@ -135,9 +149,8 @@ export async function exportTimeline(
         // and would cause FFmpeg to fail with exit code 1.
         videoClips.push({ ...clip, inputIdx });
         // Video/image clips also contribute audio unless: extracted to a linked clip,
-        // they are images, or the source file has no audio stream (hasAudio === false).
-        const sourceMedia = mediaFiles[clip.mediaFileId];
-        if (settings.includeAudio && clip.type !== 'image' && sourceMedia?.hasAudio !== false && !(clip.linkedGroupId && linkedGroupsWithAudio.has(clip.linkedGroupId))) {
+        // they are images, or the source file has no audio stream (confirmed by FFmpeg probe).
+        if (settings.includeAudio && clip.type !== 'image' && inputHasAudio.get(inputIdx) === true && !(clip.linkedGroupId && linkedGroupsWithAudio.has(clip.linkedGroupId))) {
           audioClips.push({ ...clip, inputIdx });
         }
       } else if (settings.includeAudio) {
