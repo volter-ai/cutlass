@@ -4,7 +4,7 @@ import { useTimelineStore } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
 import { DrawingCanvas } from './DrawingCanvas';
 import { DrawingStrokeRenderer } from './DrawingStrokeRenderer';
-import type { AnimationPreset, DrawingOverlay } from '../../types';
+import type { AnimationPreset } from '../../types';
 
 /** Compute fade volume multiplier (0–1) for a clip at the given playhead position */
 function computeVideoFadeMultiplier(clip: { startTime: number; duration: number; fadeIn: number; fadeOut: number }, playheadPosition: number): number {
