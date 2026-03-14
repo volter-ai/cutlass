@@ -3,6 +3,16 @@ import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import type { TimelineState } from '../store/timeline';
 import type { ExportSettings, TimelineClip } from '../types';
 
+/** Escape a string for use inside FFmpeg drawtext's text='...' option.
+ *  Order matters: backslash must be escaped first. */
+function escapeDrawtext(s: string): string {
+  return s
+    .replace(/\\/g, '\\\\')   // backslash first
+    .replace(/'/g, "\\'")
+    .replace(/:/g, '\\:')
+    .replace(/\r?\n/g, '\\n'); // actual newlines → FFmpeg \n escape
+}
+
 let ffmpeg: FFmpeg | null = null;
 
 async function getFFmpeg(onProgress: (progress: number) => void): Promise<FFmpeg> {
@@ -111,11 +121,19 @@ export async function exportTimeline(
     if (inputIdx === undefined) continue;
 
     if (track.type === 'video') {
-      videoClips.push({ ...clip, inputIdx });
-      // Video clips contribute audio unless extracted to a linked clip, they are images,
-      // or the source file has no audio stream (hasAudio === false).
-      const sourceMedia = mediaFiles[clip.mediaFileId];
-      if (settings.includeAudio && clip.type !== 'image' && sourceMedia?.hasAudio !== false && !(clip.linkedGroupId && linkedGroupsWithAudio.has(clip.linkedGroupId))) {
+      if (clip.type !== 'audio') {
+        // Only video/image clips go into the visual filter chain.
+        // An audio-only file (WAV/MP3) placed on a video track has no [v] stream
+        // and would cause FFmpeg to fail with exit code 1.
+        videoClips.push({ ...clip, inputIdx });
+        // Video/image clips also contribute audio unless: extracted to a linked clip,
+        // they are images, or the source file has no audio stream (hasAudio === false).
+        const sourceMedia = mediaFiles[clip.mediaFileId];
+        if (settings.includeAudio && clip.type !== 'image' && sourceMedia?.hasAudio !== false && !(clip.linkedGroupId && linkedGroupsWithAudio.has(clip.linkedGroupId))) {
+          audioClips.push({ ...clip, inputIdx });
+        }
+      } else if (settings.includeAudio) {
+        // Audio-only clip placed on a video track: treat it as audio-only.
         audioClips.push({ ...clip, inputIdx });
       }
     } else if (track.type === 'audio' && settings.includeAudio) {
@@ -320,7 +338,7 @@ export async function exportTimeline(
             : captionStyle.position === 'top' ? '40'
             : '(h-th)/2';
 
-          const escapedText = text.replace(/'/g, "\\'").replace(/:/g, '\\:');
+          const escapedText = escapeDrawtext(text);
           const capLabel = `cap${captionIdx}`;
           filterParts.push(
             `${overlayLabel}drawtext=fontfile=${fontPath}:text='${escapedText}':fontsize=${captionStyle.fontSize}:fontcolor=${captionStyle.color}:x=(w-tw)/2:y=${yPos}:enable='between(t,${start},${end})':box=1:boxcolor=${captionStyle.backgroundColor.replace(/,/g, '\\,')}:boxborderw=8[${capLabel}]`,
@@ -334,7 +352,7 @@ export async function exportTimeline(
 
   // Custom text overlays via drawtext
   allTextOverlays.forEach((overlay, i) => {
-    const escapedText = overlay.text.replace(/'/g, "\\'").replace(/:/g, '\\:');
+    const escapedText = escapeDrawtext(overlay.text);
     const x = overlay.style.textAlign === 'center' ? '(w-tw)/2'
       : overlay.style.textAlign === 'right' ? 'w-tw-20'
       : '20';
@@ -425,8 +443,13 @@ export async function exportTimeline(
 
   onProgress(20);
 
+  // Log the filter_complex before running so failures are diagnosable remotely.
+  const fcIdx = args.indexOf('-filter_complex');
+  if (fcIdx >= 0) console.log('[Export] filter_complex:', args[fcIdx + 1]);
+
   const exitCode = await ff.exec(args);
   if (exitCode !== 0) {
+    console.error('[Export] FFmpeg failed (code', exitCode, '). Full args:', args);
     throw new Error(`FFmpeg exited with code ${exitCode}. Check browser console for details.`);
   }
 
