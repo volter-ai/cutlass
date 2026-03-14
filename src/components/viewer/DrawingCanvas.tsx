@@ -15,7 +15,6 @@ interface Props {
 export function DrawingCanvas({ width, height, activeOverlayId, onNeedOverlay }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const drawingOverlays = useTimelineStore((s) => s.drawingOverlays);
   const activeDrawingTool = useTimelineStore((s) => s.activeDrawingTool);
   const activeDrawingColor = useTimelineStore((s) => s.activeDrawingColor);
   const activeDrawingStrokeWidth = useTimelineStore((s) => s.activeDrawingStrokeWidth);
@@ -112,8 +111,6 @@ export function DrawingCanvas({ width, height, activeOverlayId, onNeedOverlay }:
     ],
   );
 
-  const activeOverlay = activeOverlayId ? drawingOverlays[activeOverlayId] : null;
-
   // Build in-progress stroke for preview
   const inProgressStroke: DrawingStroke | null =
     inProgressPoints.length >= 1
@@ -154,18 +151,7 @@ export function DrawingCanvas({ width, height, activeOverlayId, onNeedOverlay }:
         </filter>
       </defs>
 
-      {/* Committed strokes for the active overlay */}
-      {activeOverlay?.strokes.map((stroke) => (
-        <DrawingStrokeRenderer
-          key={stroke.id}
-          stroke={stroke}
-          canvasWidth={width}
-          canvasHeight={height}
-          revealFraction={1}
-        />
-      ))}
-
-      {/* In-progress stroke preview */}
+      {/* In-progress stroke preview — committed strokes are rendered by the SVG overlay in Viewer.tsx */}
       {inProgressStroke && (
         <DrawingStrokeRenderer
           stroke={inProgressStroke}

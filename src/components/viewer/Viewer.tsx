@@ -405,9 +405,10 @@ export function Viewer() {
             );
           })}
 
-          {/* Drawing overlays SVG layer — shown when not in draw mode, OR when playing.
-               During playback, this takes over from DrawingCanvas so write-on animates. */}
-          {activeDrawingOverlays.length > 0 && (activeTool !== 'draw' || isPlaying) && (
+          {/* Drawing overlays SVG layer — always rendered when overlays are in range.
+               In draw mode (edit view): strokes fully revealed so you can see all marks.
+               In preview / playback: write-on animation from startOffset. */}
+          {activeDrawingOverlays.length > 0 && (
             <svg
               style={{
                 position: 'absolute',
@@ -428,6 +429,9 @@ export function Viewer() {
                 const elapsed = playheadPosition - overlay.startTime;
                 const drawOpacity = computeOverlayOpacity(overlay);
                 const speed = overlay.writeOnSpeed ?? 1;
+                // In draw mode show all strokes fully revealed (edit view); during
+                // preview/playback animate via startOffset write-on timing.
+                const editMode = activeTool === 'draw' && !isPlaying;
                 return (
                   <g key={overlay.id} opacity={drawOpacity}>
                     {overlay.strokes.map((stroke) => (
@@ -436,7 +440,7 @@ export function Viewer() {
                         stroke={stroke}
                         canvasWidth={displayWidth}
                         canvasHeight={displayHeight}
-                        revealFraction={computeStrokeRevealFraction(stroke, speed, elapsed)}
+                        revealFraction={editMode ? 1 : computeStrokeRevealFraction(stroke, speed, elapsed)}
                       />
                     ))}
                   </g>
