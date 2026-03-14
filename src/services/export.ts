@@ -234,9 +234,20 @@ export async function exportTimeline(
       );
     } else {
       // fit (letterbox) - default
-      filterParts.push(
-        `[${trimLabel}]scale=${sw}:${sh}:force_original_aspect_ratio=decrease,pad=${resolution.width}:${resolution.height}:(ow-iw)/2:(oh-ih)/2[${scaledLabel}]`,
-      );
+      // Always scale+pad to exact canvas first, then apply clipScale as a post-zoom.
+      // clipScale > 1: scale-up past canvas then crop back (pad can't shrink frames).
+      // clipScale < 1: scale-down then pad back to canvas.
+      const W = resolution.width;
+      const H = resolution.height;
+      let fitChain = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2`;
+      if (clipScale > 1) {
+        const cropX = Math.max(0, Math.round(posX * W / 200 + (sw - W) / 2));
+        const cropY = Math.max(0, Math.round(posY * H / 200 + (sh - H) / 2));
+        fitChain += `,scale=${sw}:${sh},crop=${W}:${H}:${cropX}:${cropY}`;
+      } else if (clipScale < 1) {
+        fitChain += `,scale=${sw}:${sh},pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2`;
+      }
+      filterParts.push(`[${trimLabel}]${fitChain}[${scaledLabel}]`);
     }
 
     // Apply clip animation effects
