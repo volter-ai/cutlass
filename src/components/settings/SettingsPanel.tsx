@@ -1,7 +1,7 @@
 import { Key, Monitor, Type, Palette } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
-import { DrawingToolPanel } from './DrawingToolPanel';
+import { DrawingEffectsPanel } from './DrawingEffectsPanel';
 import type { AspectRatio, CaptionStyle, TextStyle } from '../../types';
 
 const FONT_FAMILIES = [
@@ -61,6 +61,8 @@ export function SettingsPanel() {
     bottom: t.settings.bottom,
   };
 
+  if (activeTool === 'draw') return <DrawingEffectsPanel />;
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border)' }}>
@@ -70,9 +72,6 @@ export function SettingsPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-5">
-        {/* Drawing Tool Panel (when draw mode is active) */}
-        {activeTool === 'draw' && <DrawingToolPanel />}
-
         {/* Aspect Ratio */}
         <section>
           <div className="flex items-center gap-1.5 mb-2">

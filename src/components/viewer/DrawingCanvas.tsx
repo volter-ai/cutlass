@@ -93,6 +93,7 @@ export function DrawingCanvas({ width, height, activeOverlayId, onNeedOverlay }:
           strokeWidth: activeDrawingStrokeWidth,
           opacity: getOpacityForTexture(),
           points,
+          startOffset: 0, // store overwrites with sequential default
         };
         addStrokeToDrawingOverlay(overlayId, stroke);
       }
@@ -124,6 +125,7 @@ export function DrawingCanvas({ width, height, activeOverlayId, onNeedOverlay }:
           strokeWidth: activeDrawingStrokeWidth,
           opacity: getOpacityForTexture(),
           points: inProgressPoints,
+          startOffset: 0,
         }
       : null;
 

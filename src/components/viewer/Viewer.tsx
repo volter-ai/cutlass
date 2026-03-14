@@ -203,13 +203,12 @@ export function Viewer() {
   const fontScale = displayWidth / resolution.width;
 
   /** Compute write-on reveal fraction (0–1) for a single stroke at the given elapsed overlay time.
-   *  Strokes animate sequentially — stroke i starts only after stroke i-1 finishes.
-   *  Default: 0.5s per stroke at 1× speed (writeOnSpeed=2 → 0.25s, writeOnSpeed=0.5 → 1s). */
-  function computeStrokeRevealFraction(strokeIndex: number, writeOnSpeed: number, elapsed: number): number {
+   *  Each stroke has an explicit startOffset (seconds from overlay start).
+   *  Default sequential: stroke N starts at N * 0.5s; 0.5s draw duration at 1× speed. */
+  function computeStrokeRevealFraction(stroke: { startOffset: number }, writeOnSpeed: number, elapsed: number): number {
     if (elapsed <= 0) return 0;
     const strokeDuration = 0.5 / writeOnSpeed;
-    const strokeStart = strokeIndex * strokeDuration;
-    const strokeElapsed = elapsed - strokeStart;
+    const strokeElapsed = elapsed - stroke.startOffset;
     if (strokeElapsed <= 0) return 0;
     return Math.min(1, strokeElapsed / strokeDuration);
   }
@@ -431,13 +430,13 @@ export function Viewer() {
                 const speed = overlay.writeOnSpeed ?? 1;
                 return (
                   <g key={overlay.id} opacity={drawOpacity}>
-                    {overlay.strokes.map((stroke, strokeIndex) => (
+                    {overlay.strokes.map((stroke) => (
                       <DrawingStrokeRenderer
                         key={stroke.id}
                         stroke={stroke}
                         canvasWidth={displayWidth}
                         canvasHeight={displayHeight}
-                        revealFraction={computeStrokeRevealFraction(strokeIndex, speed, elapsed)}
+                        revealFraction={computeStrokeRevealFraction(stroke, speed, elapsed)}
                       />
                     ))}
                   </g>

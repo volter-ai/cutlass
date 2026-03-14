@@ -136,6 +136,8 @@ export interface DrawingStroke {
   strokeWidth: number;   // pixels at 1920px canvas width; scale proportionally
   opacity: number;       // baked in at creation: solid=1, marker=0.5, chalk=0.7
   points: DrawingPoint[];
+  /** Seconds from overlay start when this stroke begins its write-on animation */
+  startOffset: number;
 }
 
 /** A timed drawing layer — mirrors TextOverlay structurally */

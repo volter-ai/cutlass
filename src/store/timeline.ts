@@ -140,6 +140,7 @@ export interface TimelineState {
   addDrawingOverlay: (trackId: string, startTime: number) => string;
   updateDrawingOverlay: (id: string, updates: Partial<Pick<DrawingOverlay, 'startTime' | 'duration' | 'writeOnSpeed' | 'fadeIn' | 'fadeOut' | 'trackId'>>) => void;
   addStrokeToDrawingOverlay: (overlayId: string, stroke: DrawingStroke) => void;
+  updateStrokeInDrawingOverlay: (overlayId: string, strokeId: string, updates: Partial<Pick<DrawingStroke, 'startOffset'>>) => void;
   removeStrokeFromDrawingOverlay: (overlayId: string, strokeId: string) => void;
   removeDrawingOverlay: (id: string) => void;
   selectDrawingOverlay: (id: string | null) => void;
@@ -705,7 +706,17 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         addStrokeToDrawingOverlay: (overlayId, stroke) =>
           set((state) => {
             const overlay = state.drawingOverlays[overlayId];
-            if (overlay) overlay.strokes.push(stroke);
+            if (!overlay) return;
+            const defaultOffset = overlay.strokes.length * 0.5;
+            overlay.strokes.push({ ...stroke, startOffset: stroke.startOffset ?? defaultOffset });
+          }),
+
+        updateStrokeInDrawingOverlay: (overlayId, strokeId, updates) =>
+          set((state) => {
+            const overlay = state.drawingOverlays[overlayId];
+            if (!overlay) return;
+            const stroke = overlay.strokes.find((s) => s.id === strokeId);
+            if (stroke) Object.assign(stroke, updates);
           }),
 
         removeStrokeFromDrawingOverlay: (overlayId, strokeId) =>
