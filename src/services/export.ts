@@ -15,6 +15,8 @@ function escapeDrawtext(s: string): string {
 }
 
 let ffmpeg: FFmpeg | null = null;
+// Ring buffer of recent FFmpeg log messages — captured so export.failed events include them.
+const ffmpegLogs: string[] = [];
 
 async function getFFmpeg(onProgress: (progress: number) => void): Promise<FFmpeg> {
   if (ffmpeg && ffmpeg.loaded) return ffmpeg;
@@ -26,7 +28,11 @@ async function getFFmpeg(onProgress: (progress: number) => void): Promise<FFmpeg
   });
 
   ffmpeg.on('log', ({ type, message }) => {
-    if (type === 'stderr') console.error('[FFmpeg]', message);
+    console.error('[FFmpeg]', message);
+    if (type === 'stderr') {
+      ffmpegLogs.push(message);
+      if (ffmpegLogs.length > 120) ffmpegLogs.shift();
+    }
   });
 
   // Prefer locally-served files (no CDN latency, no blob-URL Worker issues).
@@ -57,6 +63,7 @@ export async function exportTimeline(
   settings: ExportSettings,
   onProgress: (progress: number) => void,
 ): Promise<Blob> {
+  ffmpegLogs.length = 0; // clear ring buffer from any prior run
   const ff = await getFFmpeg(onProgress);
   onProgress(5);
 
@@ -234,20 +241,22 @@ export async function exportTimeline(
       );
     } else {
       // fit (letterbox) - default
-      // Always scale+pad to exact canvas first, then apply clipScale as a post-zoom.
-      // clipScale > 1: scale-up past canvas then crop back (pad can't shrink frames).
-      // clipScale < 1: scale-down then pad back to canvas.
       const W = resolution.width;
       const H = resolution.height;
-      let fitChain = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2`;
       if (clipScale > 1) {
+        // Zoom-in: scale the source to fit within sw×sh (letterboxed), pad to sw×sh,
+        // then crop back to canvas. Avoids a second scale that can fail in FFmpeg WASM 5.x.
         const cropX = Math.max(0, Math.round(posX * W / 200 + (sw - W) / 2));
         const cropY = Math.max(0, Math.round(posY * H / 200 + (sh - H) / 2));
-        fitChain += `,scale=${sw}:${sh},crop=${W}:${H}:${cropX}:${cropY}`;
-      } else if (clipScale < 1) {
-        fitChain += `,scale=${sw}:${sh},pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2`;
+        filterParts.push(
+          `[${trimLabel}]scale=${sw}:${sh}:force_original_aspect_ratio=decrease,pad=${sw}:${sh}:(ow-iw)/2:(oh-ih)/2,crop=${W}:${H}:${cropX}:${cropY}[${scaledLabel}]`,
+        );
+      } else {
+        // clipScale <= 1: scale to canvas (or smaller), pad to canvas.
+        filterParts.push(
+          `[${trimLabel}]scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2[${scaledLabel}]`,
+        );
       }
-      filterParts.push(`[${trimLabel}]${fitChain}[${scaledLabel}]`);
     }
 
     // Apply clip animation effects
@@ -478,6 +487,7 @@ export async function exportTimeline(
       quality: settings.quality,
       exitCode,
       filterComplex: fcIdx >= 0 ? args[fcIdx + 1] : undefined,
+      ffmpegLog: ffmpegLogs.slice(-40).join('\n'),
     });
     throw new Error(`FFmpeg exited with code ${exitCode}. Check browser console for details.`);
   }
