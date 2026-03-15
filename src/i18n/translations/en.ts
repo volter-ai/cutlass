@@ -393,6 +393,34 @@ export const en = {
     // Update log (most recent first)
     updateEntries: [
       {
+        date: '2026-03-14 (v7)',
+        items: [
+          'Claude support: choose GPT-4o, Claude Sonnet 4.6, or Claude Opus 4.6 as your AI model in Settings.',
+          'Anthropic API key field in Settings — appears when a Claude model is selected.',
+          'AI Chapter Markers: "Chapters" button in Transcript tab generates named chapter titles and places them as text overlays.',
+          'Silence Detection: "Detect Silence" in Transcript tab finds low-amplitude gaps (≥0.5 s) and removes them with one click.',
+          'All AI features (Chat, Document, Chapters) now route to whichever model is selected.',
+        ],
+      },
+      {
+        date: '2026-03-14 (v6)',
+        items: [
+          'Fixed playback overshoot — stops exactly at last content, not 5 s after.',
+          'Fixed ripple-delete corrupting linked video+audio clips.',
+          'Fixed AI edit proxy URL (was calling OpenAI directly instead of through the dev-server proxy).',
+          'Fixed caption style presets overwriting manual text overlays.',
+          'Fixed captions duplicating when "Add Captions to Timeline" is clicked more than once.',
+          'Fixed multi-turn AI conversation context — prior messages now included each request.',
+          'Fixed trim bounds: clips cannot be shorter than 0.1 s or produce a negative media offset.',
+          'AI operations validated before execution (speed, volume, time ranges all checked).',
+          'FFmpeg resets automatically after a worker crash — subsequent exports succeed.',
+          'Files >500 MB show a memory warning before audio extraction.',
+          'Auto-save failures show a yellow "Save failed" badge in the toolbar.',
+          'Timeline drag perf: clip filtering memoized, snap-point cache added.',
+          'Ken Burns / zoom animations now export with real motion (was freezing on first frame).',
+        ],
+      },
+      {
         date: '2026-03-11 (v5)',
         items: [
           'AI Edit panel: natural language editing commands via OpenAI (Chat mode).',

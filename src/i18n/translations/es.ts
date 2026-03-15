@@ -395,6 +395,33 @@ export const es: Translations = {
     // Update log (most recent first)
     updateEntries: [
       {
+        date: '2026-03-14 (v7)',
+        items: [
+          'Soporte de Claude: elige GPT-4o, Claude Sonnet 4.6 u Claude Opus 4.6 como modelo de IA en Configuración.',
+          'Campo de clave de API de Anthropic en Configuración, visible al seleccionar un modelo Claude.',
+          'Marcadores de capítulos con IA: el botón "Chapters" en la pestaña Transcripción genera títulos y los añade como superposiciones de texto.',
+          'Detección de silencio: "Detect Silence" en la pestaña Transcripción encuentra pausas de ≥0,5 s y las elimina con un clic.',
+          'Chat, Documento y Capítulos usan automáticamente el modelo seleccionado.',
+        ],
+      },
+      {
+        date: '2026-03-14 (v6)',
+        items: [
+          'Corregido el desbordamiento de reproducción — se detiene exactamente al final del contenido.',
+          'Corregido ripple-delete que corrompía clips de video+audio vinculados.',
+          'Corregida la URL del proxy de IA (llamaba a OpenAI directamente en lugar del proxy).',
+          'Corregido: los estilos de subtítulos ya no sobreescriben superposiciones de texto manuales.',
+          'Corregida la duplicación de subtítulos al hacer clic en "Añadir subtítulos" más de una vez.',
+          'Corregido el contexto de conversación de IA — los mensajes previos se incluyen en cada solicitud.',
+          'Corregidos los límites de recorte: los clips no pueden tener menos de 0,1 s de duración.',
+          'Las operaciones de IA se validan antes de ejecutarse.',
+          'FFmpeg se reinicia automáticamente tras un fallo del worker.',
+          'Los archivos >500 MB muestran una advertencia antes de la extracción de audio.',
+          'Los fallos de guardado automático muestran una insignia amarilla en la barra de herramientas.',
+          'Las animaciones Ken Burns y zoom exportan con movimiento real (antes se congelaban en el primer fotograma).',
+        ],
+      },
+      {
         date: '2026-03-11 (v5)',
         items: [
           'Panel de edici\u00f3n con IA: comandos de edici\u00f3n en lenguaje natural v\u00eda OpenAI (modo Chat).',
