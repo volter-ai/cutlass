@@ -144,14 +144,21 @@ Rules:
 - Each operation must include a human-readable "reason" field.
 - Return operations in the order they should be executed.`;
 
+// --- Types ---
+
+export interface ConversationTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 // --- OpenAI caller ---
 
 async function callOpenAI(
   apiKey: string,
   systemPrompt: string,
-  userMessage: string,
+  messages: ConversationTurn[],
 ): Promise<AIEditResponse> {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch('/api/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -163,7 +170,7 @@ async function callOpenAI(
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
+        ...messages,
       ],
     }),
   });
@@ -196,17 +203,27 @@ async function callOpenAI(
 // --- Public API ---
 
 /**
- * Chat mode: send a natural language editing command.
+ * Chat mode: send a natural language editing command with conversation history.
+ * The history allows follow-up questions to reference prior context.
  * Returns proposed operations for preview before execution.
  */
 export async function parseChat(
   state: TimelineState,
   userMessage: string,
   apiKey: string,
+  history: ConversationTurn[] = [],
 ): Promise<AIEditResponse> {
   const context = buildContext(state);
-  const fullMessage = `## Current Timeline State\n${context}\n\n## User Command\n${userMessage}`;
-  return callOpenAI(apiKey, CHAT_SYSTEM_PROMPT, fullMessage);
+  // Inject the current timeline state into the first user turn so the model
+  // always has the latest state regardless of conversation length.
+  const contextMessage: ConversationTurn = {
+    role: 'user',
+    content: `## Current Timeline State\n${context}\n\n## User Command\n${userMessage}`,
+  };
+  // Prepend history (prior turns) before the current message. Keep the context
+  // injection only in the current turn to avoid duplicating it in every message.
+  const messages: ConversationTurn[] = [...history, contextMessage];
+  return callOpenAI(apiKey, CHAT_SYSTEM_PROMPT, messages);
 }
 
 /**
@@ -220,5 +237,5 @@ export async function parseDocument(
 ): Promise<AIEditResponse> {
   const context = buildContext(state);
   const fullMessage = `## Current Timeline State\n${context}\n\n## Requirements Document\n${documentText}`;
-  return callOpenAI(apiKey, DOCUMENT_SYSTEM_PROMPT, fullMessage);
+  return callOpenAI(apiKey, DOCUMENT_SYSTEM_PROMPT, [{ role: 'user', content: fullMessage }]);
 }

@@ -84,6 +84,32 @@ function getAnimationStyle(
   }
 }
 
+/** Compute write-on reveal fraction (0–1) for a single stroke at the given elapsed overlay time. */
+function computeStrokeRevealFraction(stroke: { startOffset: number }, writeOnSpeed: number, elapsed: number): number {
+  if (elapsed <= 0) return 0;
+  const strokeDuration = 0.5 / writeOnSpeed;
+  const strokeElapsed = elapsed - stroke.startOffset;
+  if (strokeElapsed <= 0) return 0;
+  return Math.min(1, strokeElapsed / strokeDuration);
+}
+
+/** Compute fade opacity for drawing/text overlays */
+function computeOverlayOpacity(
+  overlay: { startTime: number; duration: number; fadeIn?: number; fadeOut?: number },
+  playheadPosition: number,
+): number {
+  const elapsed = playheadPosition - overlay.startTime;
+  const remaining = overlay.startTime + overlay.duration - playheadPosition;
+  let opacity = 1;
+  if (overlay.fadeIn && overlay.fadeIn > 0 && elapsed < overlay.fadeIn) {
+    opacity = Math.max(0, elapsed / overlay.fadeIn);
+  }
+  if (overlay.fadeOut && overlay.fadeOut > 0 && remaining < overlay.fadeOut) {
+    opacity = Math.min(opacity, Math.max(0, remaining / overlay.fadeOut));
+  }
+  return opacity;
+}
+
 export function Viewer() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoAreaRef = useRef<HTMLDivElement>(null);
@@ -201,31 +227,6 @@ export function Viewer() {
   }, [drawingOverlays, playheadPosition]);
 
   const fontScale = displayWidth / resolution.width;
-
-  /** Compute write-on reveal fraction (0–1) for a single stroke at the given elapsed overlay time.
-   *  Each stroke has an explicit startOffset (seconds from overlay start).
-   *  Default sequential: stroke N starts at N * 0.5s; 0.5s draw duration at 1× speed. */
-  function computeStrokeRevealFraction(stroke: { startOffset: number }, writeOnSpeed: number, elapsed: number): number {
-    if (elapsed <= 0) return 0;
-    const strokeDuration = 0.5 / writeOnSpeed;
-    const strokeElapsed = elapsed - stroke.startOffset;
-    if (strokeElapsed <= 0) return 0;
-    return Math.min(1, strokeElapsed / strokeDuration);
-  }
-
-  /** Compute fade opacity for drawing/text overlays */
-  function computeOverlayOpacity(overlay: { startTime: number; duration: number; fadeIn?: number; fadeOut?: number }): number {
-    const elapsed = playheadPosition - overlay.startTime;
-    const remaining = overlay.startTime + overlay.duration - playheadPosition;
-    let opacity = 1;
-    if (overlay.fadeIn && overlay.fadeIn > 0 && elapsed < overlay.fadeIn) {
-      opacity = Math.max(0, elapsed / overlay.fadeIn);
-    }
-    if (overlay.fadeOut && overlay.fadeOut > 0 && remaining < overlay.fadeOut) {
-      opacity = Math.min(opacity, Math.max(0, remaining / overlay.fadeOut));
-    }
-    return opacity;
-  }
 
   /** Called by DrawingCanvas when no overlay is active — creates one automatically */
   const handleNeedOverlay = useCallback((): string => {
@@ -375,7 +376,7 @@ export function Viewer() {
 
           {/* Text overlays */}
           {activeTextOverlays.map((overlay) => {
-            const textOpacity = computeOverlayOpacity(overlay);
+            const textOpacity = computeOverlayOpacity(overlay, playheadPosition);
             return (
               <div
                 key={overlay.id}
@@ -427,7 +428,7 @@ export function Viewer() {
               </defs>
               {activeDrawingOverlays.map((overlay) => {
                 const elapsed = playheadPosition - overlay.startTime;
-                const drawOpacity = computeOverlayOpacity(overlay);
+                const drawOpacity = computeOverlayOpacity(overlay, playheadPosition);
                 const speed = overlay.writeOnSpeed ?? 1;
                 // In draw mode show all strokes fully revealed (edit view); during
                 // preview/playback animate via startOffset write-on timing.

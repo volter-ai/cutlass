@@ -3,6 +3,7 @@ import { Sparkles, Send, FileText, Loader2, Check, X, AlertCircle, MessageSquare
 import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
 import { parseChat, parseDocument } from '../../services/ai-edit';
+import type { ConversationTurn } from '../../services/ai-edit';
 import { describeOperation, executeOperations } from '../../services/ai-edit-operations';
 import type { AIEditOperation } from '../../services/ai-edit-operations';
 
@@ -54,7 +55,21 @@ export function AIEditPanel() {
 
     try {
       const state = storeApi.getState();
-      const result = await parseChat(state, trimmed, settings.openaiApiKey);
+
+      // Build conversation history from prior user/assistant turns so the LLM
+      // has context for follow-up questions (e.g. "do that to the second clip instead").
+      const history: ConversationTurn[] = [];
+      for (const msg of messages) {
+        if (msg.role === 'user') {
+          history.push({ role: 'user', content: msg.text });
+        } else if (msg.role === 'assistant') {
+          history.push({ role: 'assistant', content: msg.text });
+        } else if (msg.role === 'operations' && msg.summary) {
+          history.push({ role: 'assistant', content: msg.summary });
+        }
+      }
+
+      const result = await parseChat(state, trimmed, settings.openaiApiKey, history);
 
       if (result.operations.length === 0) {
         addMessage({ role: 'assistant', text: result.summary || 'No changes needed.' });
@@ -74,7 +89,7 @@ export function AIEditPanel() {
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, settings.openaiApiKey, storeApi, addMessage]);
+  }, [input, isLoading, messages, settings.openaiApiKey, storeApi, addMessage]);
 
   // --- Document mode ---
 

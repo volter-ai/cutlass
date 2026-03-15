@@ -99,6 +99,8 @@ export interface TimelineState {
   currentProjectId: string | null;
   currentProjectName: string;
   projectSaved: boolean;
+  /** True when the last auto-save attempt failed (e.g. localStorage quota exceeded). */
+  autoSaveFailed: boolean;
 
   // Actions - Media
   addMediaFile: (file: MediaFile) => void;
@@ -198,6 +200,7 @@ export interface TimelineState {
   setCurrentProject: (id: string | null, name: string) => void;
   markProjectSaved: () => void;
   markProjectDirty: () => void;
+  setAutoSaveFailed: (failed: boolean) => void;
 
   // Computed
   getClipsForTrack: (trackId: string) => TimelineClip[];
@@ -270,6 +273,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         currentProjectId: null,
         currentProjectName: 'Untitled Project',
         projectSaved: true,
+        autoSaveFailed: false,
 
         addMediaFile: (file) => {
           set((state) => {
@@ -451,15 +455,30 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             const trackId = clip.trackId;
             const clipEnd = clip.startTime + clip.duration;
             const gap = clip.duration;
+            const linkedGroupId = clip.linkedGroupId;
 
-            delete state.clips[clipId];
-            state.selectedClipIds = state.selectedClipIds.filter((id) => id !== clipId);
+            // Collect all IDs to remove (the clip itself + any linked clips on other tracks)
+            const idsToRemove = new Set<string>([clipId]);
+            if (linkedGroupId) {
+              for (const c of Object.values(state.clips)) {
+                if (c.linkedGroupId === linkedGroupId && c.id !== clipId) {
+                  idsToRemove.add(c.id);
+                }
+              }
+            }
 
-            Object.values(state.clips).forEach((c) => {
+            // Delete removed clips
+            for (const id of idsToRemove) {
+              delete state.clips[id];
+            }
+            state.selectedClipIds = state.selectedClipIds.filter((id) => !idsToRemove.has(id));
+
+            // Shift remaining clips on the same track that start after the gap
+            for (const c of Object.values(state.clips)) {
               if (c.trackId === trackId && c.startTime >= clipEnd) {
                 c.startTime -= gap;
               }
-            });
+            }
           });
           get().recalculateDuration();
         },
@@ -1020,6 +1039,17 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             });
           }
 
+          // Idempotent: remove any previously generated captions on this track
+          // (source === 'caption') before adding new ones, so re-running doesn't duplicate.
+          set((s) => {
+            for (const id of Object.keys(s.textOverlays)) {
+              const ov = s.textOverlays[id];
+              if (ov.source === 'caption' && ov.trackId === textTrackId) {
+                delete s.textOverlays[id];
+              }
+            }
+          });
+
           // Build caption text overlays grouped by maxWords
           set((s) => {
             // Y position based on captionStyle.position
@@ -1042,6 +1072,7 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
                   startTime: start,
                   duration: Math.max(0.1, end - start),
                   text,
+                  source: 'caption',
                   style: {
                     fontFamily: captionStyle.fontFamily ?? 'Arial',
                     fontSize: captionStyle.fontSize ?? 24,
@@ -1088,11 +1119,13 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
         setCaptionStyle: (style) =>
           set((state) => {
             Object.assign(state.settings.captionStyle, style);
-            // Apply style changes to all existing text overlays
+            // Apply style changes only to caption-generated overlays.
+            // Manually placed text overlays must never be overwritten by global caption settings.
             const yPos = state.settings.captionStyle.position === 'bottom' ? 88
               : state.settings.captionStyle.position === 'top' ? 10
               : 50;
             Object.values(state.textOverlays).forEach((overlay) => {
+              if (overlay.source !== 'caption') return;
               if (style.fontSize !== undefined) overlay.style.fontSize = style.fontSize;
               if (style.color !== undefined) overlay.style.color = style.color;
               if (style.backgroundColor !== undefined) overlay.style.backgroundColor = style.backgroundColor;
@@ -1159,6 +1192,11 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             state.projectSaved = false;
           }),
 
+        setAutoSaveFailed: (failed) =>
+          set((state) => {
+            state.autoSaveFailed = failed;
+          }),
+
         getClipsForTrack: (trackId) =>
           Object.values(get().clips)
             .filter((c) => c.trackId === trackId)
@@ -1201,16 +1239,27 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
 
         recalculateDuration: () =>
           set((state) => {
+            // Use for..of with direct key access instead of Object.values() to avoid
+            // creating intermediate arrays on every drag frame.
             let maxEnd = 0;
-            Object.values(state.clips).forEach((clip) => {
-              maxEnd = Math.max(maxEnd, clip.startTime + clip.duration);
-            });
-            Object.values(state.textOverlays).forEach((overlay) => {
-              maxEnd = Math.max(maxEnd, overlay.startTime + overlay.duration);
-            });
-            Object.values(state.drawingOverlays).forEach((overlay) => {
-              maxEnd = Math.max(maxEnd, overlay.startTime + overlay.duration);
-            });
+            const clipKeys = Object.keys(state.clips);
+            for (let i = 0; i < clipKeys.length; i++) {
+              const c = state.clips[clipKeys[i]];
+              const end = c.startTime + c.duration;
+              if (end > maxEnd) maxEnd = end;
+            }
+            const txtKeys = Object.keys(state.textOverlays);
+            for (let i = 0; i < txtKeys.length; i++) {
+              const o = state.textOverlays[txtKeys[i]];
+              const end = o.startTime + o.duration;
+              if (end > maxEnd) maxEnd = end;
+            }
+            const drwKeys = Object.keys(state.drawingOverlays);
+            for (let i = 0; i < drwKeys.length; i++) {
+              const o = state.drawingOverlays[drwKeys[i]];
+              const end = o.startTime + o.duration;
+              if (end > maxEnd) maxEnd = end;
+            }
             state.duration = maxEnd + 5;
           }),
       })),

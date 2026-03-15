@@ -1,5 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { useTimelineStore, useTimelineStoreApi } from '../store/timeline';
+import type { TimelineState } from '../store/timeline';
+
+/** Compute the actual content end (no padding) from clips and overlays. */
+function getContentEnd(state: TimelineState): number {
+  let end = 0;
+  for (const c of Object.values(state.clips)) end = Math.max(end, c.startTime + c.duration);
+  for (const o of Object.values(state.textOverlays)) end = Math.max(end, o.startTime + o.duration);
+  for (const o of Object.values(state.drawingOverlays)) end = Math.max(end, o.startTime + o.duration);
+  return end;
+}
 
 export function usePlayback() {
   const isPlaying = useTimelineStore((s) => s.isPlaying);
@@ -24,8 +34,9 @@ export function usePlayback() {
 
       const state = storeApi.getState();
       const newPosition = state.playheadPosition + delta;
+      const contentEnd = getContentEnd(state);
 
-      if (newPosition >= state.duration) {
+      if (contentEnd === 0 || newPosition >= contentEnd) {
         setPlayheadPosition(0);
         setIsPlaying(false);
         return;

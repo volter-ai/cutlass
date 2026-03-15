@@ -90,6 +90,59 @@ export function describeOperation(op: AIEditOperation, state: TimelineState): st
 
 // --- Executor ---
 
+/** Validate and sanitize an AI operation's numeric parameters against the current state.
+ *  Returns an error string if invalid, or null if OK. */
+function validateOp(op: AIEditOperation, store: TimelineState): string | null {
+  const dur = store.duration;
+  switch (op.type) {
+    case 'split-at-time':
+      if (typeof op.time !== 'number' || op.time <= 0 || op.time >= dur)
+        return `split-at-time: time ${op.time} is outside timeline range [0, ${dur.toFixed(1)}]`;
+      break;
+    case 'trim-clip-start': {
+      const clip = store.clips[op.clipId];
+      if (!clip) break; // handled by caller
+      if (typeof op.newStartTime !== 'number' || op.newStartTime < 0)
+        return `trim-clip-start: newStartTime must be >= 0, got ${op.newStartTime}`;
+      if (op.newStartTime >= clip.startTime + clip.duration)
+        return `trim-clip-start: newStartTime ${op.newStartTime.toFixed(2)} is past clip end ${(clip.startTime + clip.duration).toFixed(2)}`;
+      break;
+    }
+    case 'trim-clip-end': {
+      const clip = store.clips[op.clipId];
+      if (!clip) break;
+      if (typeof op.newEndTime !== 'number' || op.newEndTime <= clip.startTime)
+        return `trim-clip-end: newEndTime ${op.newEndTime?.toFixed(2)} must be > clip start ${clip.startTime.toFixed(2)}`;
+      break;
+    }
+    case 'move-clip':
+      if (typeof op.newStartTime !== 'number' || op.newStartTime < 0)
+        return `move-clip: newStartTime must be >= 0, got ${op.newStartTime}`;
+      break;
+    case 'set-speed':
+      if (typeof op.speed !== 'number' || op.speed < 0.25 || op.speed > 4)
+        return `set-speed: speed must be 0.25–4, got ${op.speed}`;
+      break;
+    case 'set-volume':
+      if (typeof op.volume !== 'number' || op.volume < 0 || op.volume > 2)
+        return `set-volume: volume must be 0–2, got ${op.volume}`;
+      break;
+    case 'add-text-overlay':
+      if (typeof op.startTime !== 'number' || op.startTime < 0)
+        return `add-text-overlay: startTime must be >= 0, got ${op.startTime}`;
+      if (typeof op.duration !== 'number' || op.duration <= 0)
+        return `add-text-overlay: duration must be > 0, got ${op.duration}`;
+      if (!op.text?.trim())
+        return 'add-text-overlay: text cannot be empty';
+      break;
+    case 'add-transition':
+      if (typeof op.duration !== 'number' || op.duration <= 0)
+        return `add-transition: duration must be > 0, got ${op.duration}`;
+      break;
+  }
+  return null;
+}
+
 export function executeOperations(
   storeApi: { getState: () => TimelineState; temporal: { getState: () => { pause: () => void; resume: () => void } } },
   operations: AIEditOperation[],
@@ -104,6 +157,10 @@ export function executeOperations(
     for (const op of operations) {
       const store = storeApi.getState();
       try {
+        // Validate parameters before applying — LLM output can be out-of-range
+        const validationError = validateOp(op, store);
+        if (validationError) { errors.push(validationError); continue; }
+
         switch (op.type) {
           case 'remove-clip':
             if (!store.clips[op.clipId]) { errors.push(`Clip ${op.clipId} not found`); continue; }

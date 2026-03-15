@@ -131,7 +131,12 @@ export default function App() {
 
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = setTimeout(() => {
-        autoSaveLocal(storeApi.getState());
+        try {
+          autoSaveLocal(storeApi.getState());
+          storeApi.getState().setAutoSaveFailed(false);
+        } catch {
+          storeApi.getState().setAutoSaveFailed(true);
+        }
       }, 3000);
     });
     return () => {

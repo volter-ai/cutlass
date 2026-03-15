@@ -16,6 +16,7 @@ import {
   HelpCircle,
   FolderOpen,
   Sparkles,
+  AlertTriangle,
 } from 'lucide-react';
 import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { formatTimecode } from '../../utils/time';
@@ -43,6 +44,7 @@ export function Toolbar() {
     settings,
     currentProjectName,
     projectSaved,
+    autoSaveFailed,
     leftPanelTab,
     setLeftPanelTab,
   } = useTimelineStore();
@@ -72,6 +74,16 @@ export function Toolbar() {
           {currentProjectName}
           {!projectSaved && <span style={{ color: 'var(--playhead)' }}> *</span>}
         </span>
+        {autoSaveFailed && (
+          <span
+            title="Auto-save failed (storage may be full). Use File → Save to save manually."
+            className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded"
+            style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.12)' }}
+          >
+            <AlertTriangle size={11} />
+            Save failed
+          </span>
+        )}
       </div>
 
       {/* Projects */}

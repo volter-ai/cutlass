@@ -96,6 +96,8 @@ export interface TextOverlay {
   fadeIn?: number;
   /** Fade-out duration in seconds */
   fadeOut?: number;
+  /** How this overlay was created — 'caption' overlays are managed by addTranscriptCaptionsToTimeline */
+  source?: 'manual' | 'caption';
 }
 
 export interface TextStyle {
