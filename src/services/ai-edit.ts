@@ -1,5 +1,6 @@
 import type { TimelineState } from '../store/timeline';
 import type { AIEditResponse } from './ai-edit-operations';
+import type { AIModel } from '../types';
 
 // --- Context builder ---
 
@@ -46,7 +47,18 @@ export function buildContext(state: TimelineState): string {
   if (overlays.length > 0) {
     lines.push('\n## Text Overlays');
     for (const ov of overlays) {
-      lines.push(`- id=${ov.id} "${ov.text}" at ${formatTime(ov.startTime)} dur=${ov.duration.toFixed(1)}s`);
+      const src = ov.source === 'caption' ? ' [caption]' : '';
+      lines.push(`- id=${ov.id} "${ov.text}" at ${formatTime(ov.startTime)} dur=${ov.duration.toFixed(1)}s${src}`);
+    }
+  }
+
+  // Drawing overlays
+  const drawings = Object.values(state.drawingOverlays);
+  if (drawings.length > 0) {
+    lines.push('\n## Drawing Overlays');
+    for (const dov of drawings) {
+      const tools = [...new Set(dov.strokes.map((s) => s.tool))].join(', ') || 'none';
+      lines.push(`- id=${dov.id} track=${dov.trackId} at ${formatTime(dov.startTime)} dur=${dov.duration.toFixed(1)}s strokes=${dov.strokes.length} tools=[${tools}]`);
     }
   }
 
@@ -151,6 +163,11 @@ export interface ConversationTurn {
   content: string;
 }
 
+export interface ChapterMarker {
+  name: string;
+  start: number; // seconds
+}
+
 // --- OpenAI caller ---
 
 async function callOpenAI(
@@ -200,6 +217,90 @@ async function callOpenAI(
   return parsed;
 }
 
+// --- Anthropic caller ---
+
+const ANTHROPIC_MODEL_IDS: Record<Exclude<AIModel, 'gpt-4o'>, string> = {
+  'claude-sonnet': 'claude-sonnet-4-6',
+  'claude-opus': 'claude-opus-4-6',
+};
+
+async function callAnthropic(
+  apiKey: string,
+  model: Exclude<AIModel, 'gpt-4o'>,
+  systemPrompt: string,
+  messages: ConversationTurn[],
+): Promise<AIEditResponse> {
+  const modelId = ANTHROPIC_MODEL_IDS[model];
+  // Claude doesn't have a response_format param — instruct it to return raw JSON.
+  const systemWithJsonInstruction =
+    systemPrompt + '\n\nIMPORTANT: Respond with raw JSON only. No markdown fences, no explanation text. Just the JSON object.';
+
+  const response = await fetch('/api/anthropic/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: modelId,
+      max_tokens: 4096,
+      system: systemWithJsonInstruction,
+      messages,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    if (response.status === 401) {
+      throw new Error('Invalid Anthropic API key. Check your key in Settings.');
+    }
+    if (response.status === 429) {
+      throw new Error('Rate limited by Anthropic. Please wait a moment and try again.');
+    }
+    throw new Error(`Anthropic API error (${response.status}): ${body}`);
+  }
+
+  const data = await response.json();
+  const content = data.content?.[0]?.text as string | undefined;
+  if (!content) {
+    throw new Error('Empty response from Anthropic');
+  }
+
+  // Strip any accidental markdown fences Claude might still emit
+  const cleaned = content.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
+
+  let parsed: AIEditResponse;
+  try {
+    parsed = JSON.parse(cleaned) as AIEditResponse;
+  } catch {
+    throw new Error('Failed to parse Anthropic response as JSON');
+  }
+
+  if (!Array.isArray(parsed.operations)) {
+    throw new Error('Invalid response format: missing operations array');
+  }
+
+  return parsed;
+}
+
+// --- Dispatcher ---
+
+function callModel(
+  model: AIModel,
+  openaiApiKey: string,
+  anthropicApiKey: string,
+  systemPrompt: string,
+  messages: ConversationTurn[],
+): Promise<AIEditResponse> {
+  if (model === 'gpt-4o') {
+    if (!openaiApiKey) throw new Error('OpenAI API key not set. Add it in Settings.');
+    return callOpenAI(openaiApiKey, systemPrompt, messages);
+  }
+  if (!anthropicApiKey) throw new Error('Anthropic API key not set. Add it in Settings.');
+  return callAnthropic(anthropicApiKey, model, systemPrompt, messages);
+}
+
 // --- Public API ---
 
 /**
@@ -210,9 +311,9 @@ async function callOpenAI(
 export async function parseChat(
   state: TimelineState,
   userMessage: string,
-  apiKey: string,
   history: ConversationTurn[] = [],
 ): Promise<AIEditResponse> {
+  const { aiModel = 'gpt-4o', openaiApiKey, anthropicApiKey } = state.settings;
   const context = buildContext(state);
   // Inject the current timeline state into the first user turn so the model
   // always has the latest state regardless of conversation length.
@@ -220,10 +321,9 @@ export async function parseChat(
     role: 'user',
     content: `## Current Timeline State\n${context}\n\n## User Command\n${userMessage}`,
   };
-  // Prepend history (prior turns) before the current message. Keep the context
-  // injection only in the current turn to avoid duplicating it in every message.
+  // Prepend history (prior turns) before the current message.
   const messages: ConversationTurn[] = [...history, contextMessage];
-  return callOpenAI(apiKey, CHAT_SYSTEM_PROMPT, messages);
+  return callModel(aiModel, openaiApiKey, anthropicApiKey, CHAT_SYSTEM_PROMPT, messages);
 }
 
 /**
@@ -233,9 +333,125 @@ export async function parseChat(
 export async function parseDocument(
   state: TimelineState,
   documentText: string,
-  apiKey: string,
 ): Promise<AIEditResponse> {
+  const { aiModel = 'gpt-4o', openaiApiKey, anthropicApiKey } = state.settings;
   const context = buildContext(state);
   const fullMessage = `## Current Timeline State\n${context}\n\n## Requirements Document\n${documentText}`;
-  return callOpenAI(apiKey, DOCUMENT_SYSTEM_PROMPT, [{ role: 'user', content: fullMessage }]);
+  return callModel(aiModel, openaiApiKey, anthropicApiKey, DOCUMENT_SYSTEM_PROMPT, [{ role: 'user', content: fullMessage }]);
+}
+
+// --- Chapter generation ---
+
+const CHAPTER_SYSTEM_PROMPT = `You are a video chapter analyzer. Given a video transcript with timestamps, identify natural chapter breaks.
+
+Return JSON with this exact shape:
+{
+  "chapters": [
+    {"name": "Introduction", "start": 0},
+    {"name": "Chapter Name", "start": <seconds>}
+  ]
+}
+
+Rules:
+- Include 3-10 chapters (more for longer videos)
+- Chapter names should be concise (2-5 words, title case)
+- The first chapter MUST start at 0
+- start values are numbers in seconds
+- Only output the JSON — no explanation text`;
+
+/**
+ * Sends the transcript from state to the configured AI model and returns
+ * a list of chapter markers (name + start time in seconds).
+ */
+export async function generateChapters(state: TimelineState): Promise<ChapterMarker[]> {
+  const { aiModel = 'gpt-4o', openaiApiKey, anthropicApiKey } = state.settings;
+
+  const transcripts = Object.values(state.transcripts);
+  if (transcripts.length === 0) {
+    throw new Error('No transcript available. Transcribe your video first.');
+  }
+
+  const transcript = transcripts[0];
+  const transcriptText = transcript.segments
+    .map((seg) => {
+      const text = seg.words
+        .filter((w) => !w.isRemoved)
+        .map((w) => w.word)
+        .join(' ')
+        .trim();
+      return text ? `[${formatTime(seg.start)}] ${text}` : null;
+    })
+    .filter(Boolean)
+    .join('\n');
+
+  if (!transcriptText) {
+    throw new Error('Transcript has no content to analyze.');
+  }
+
+  const userMessage = `Please generate chapter markers for this video transcript:\n\n${transcriptText}`;
+
+  // Reuse callModel but with a specialized prompt — response_format json_object for OpenAI,
+  // raw JSON instruction for Anthropic. We parse the operations shape manually below.
+  let rawText: string;
+
+  if (aiModel === 'gpt-4o') {
+    if (!openaiApiKey) throw new Error('OpenAI API key not set. Add it in Settings.');
+    const response = await fetch('/api/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiApiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
+        messages: [{ role: 'system', content: CHAPTER_SYSTEM_PROMPT }, { role: 'user', content: userMessage }],
+      }),
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      if (response.status === 401) throw new Error('Invalid OpenAI API key. Check your key in Settings.');
+      if (response.status === 429) throw new Error('Rate limited by OpenAI. Please wait a moment and try again.');
+      throw new Error(`OpenAI API error (${response.status}): ${body}`);
+    }
+    const data = await response.json();
+    rawText = data.choices?.[0]?.message?.content ?? '';
+  } else {
+    if (!anthropicApiKey) throw new Error('Anthropic API key not set. Add it in Settings.');
+    const modelId = ANTHROPIC_MODEL_IDS[aiModel as Exclude<AIModel, 'gpt-4o'>];
+    const response = await fetch('/api/anthropic/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicApiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: 2048,
+        system: CHAPTER_SYSTEM_PROMPT + '\n\nIMPORTANT: Respond with raw JSON only. No markdown fences.',
+        messages: [{ role: 'user', content: userMessage }],
+      }),
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      if (response.status === 401) throw new Error('Invalid Anthropic API key. Check your key in Settings.');
+      if (response.status === 429) throw new Error('Rate limited by Anthropic. Please wait a moment and try again.');
+      throw new Error(`Anthropic API error (${response.status}): ${body}`);
+    }
+    const data = await response.json();
+    rawText = ((data.content?.[0]?.text as string | undefined) ?? '')
+      .replace(/^```(?:json)?\n?/i, '')
+      .replace(/\n?```$/i, '')
+      .trim();
+  }
+
+  if (!rawText) throw new Error('Empty response from AI model.');
+
+  let parsed: { chapters: ChapterMarker[] };
+  try {
+    parsed = JSON.parse(rawText) as { chapters: ChapterMarker[] };
+  } catch {
+    throw new Error('Failed to parse chapter response as JSON.');
+  }
+
+  if (!Array.isArray(parsed.chapters) || parsed.chapters.length === 0) {
+    throw new Error('AI returned no chapters.');
+  }
+
+  return parsed.chapters;
 }

@@ -167,6 +167,8 @@ export interface CaptionStyle {
 
 export type AspectRatio = '16:9' | '9:16' | '1:1' | '4:5';
 
+export type AIModel = 'gpt-4o' | 'claude-sonnet' | 'claude-opus';
+
 export interface ProjectSettings {
   aspectRatio: AspectRatio;
   resolution: { width: number; height: number };
@@ -174,6 +176,9 @@ export interface ProjectSettings {
   captionStyle: CaptionStyle;
   deepgramApiKey: string;
   openaiApiKey: string;
+  anthropicApiKey: string;
+  /** Which model to use for AI editing commands */
+  aiModel: AIModel;
   backgroundColor: string;
 }
 

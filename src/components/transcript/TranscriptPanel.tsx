@@ -7,9 +7,17 @@ import {
   Layers,
   MessageSquarePlus,
   CheckCircle,
+  BookMarked,
+  VolumeX,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
-import { useTimelineStore } from '../../store/timeline';
+import { useTimelineStore, useTimelineStoreApi } from '../../store/timeline';
 import { transcribeMedia } from '../../services/transcription';
+import { generateChapters } from '../../services/ai-edit';
+import { detectSilence } from '../../services/silence';
+import type { ChapterMarker } from '../../services/ai-edit';
+import type { SilenceRegion } from '../../services/silence';
 import { useLanguage } from '../../context/LanguageProvider';
 import type { FillerRemovalMode } from '../../types';
 
@@ -23,9 +31,12 @@ export function TranscriptPanel() {
     removeFillerWords,
     detectScenes,
     addTranscriptCaptionsToTimeline,
+    addChapterMarkersToTimeline,
+    removeSilenceRegions,
     setPlayheadPosition,
     settings,
   } = useTimelineStore();
+  const storeApi = useTimelineStoreApi();
   const { t } = useLanguage();
 
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -33,6 +44,18 @@ export function TranscriptPanel() {
   const [fillerMode, setFillerMode] = useState<FillerRemovalMode>('delete');
   const [captionsJustAdded, setCaptionsJustAdded] = useState(false);
   const captionsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Chapter state
+  const [isGeneratingChapters, setIsGeneratingChapters] = useState(false);
+  const [chapterError, setChapterError] = useState<string | null>(null);
+  const [pendingChapters, setPendingChapters] = useState<ChapterMarker[] | null>(null);
+  const [chaptersExpanded, setChaptersExpanded] = useState(true);
+
+  // Silence detection state
+  const [isDetectingSilence, setIsDetectingSilence] = useState(false);
+  const [silenceError, setSilenceError] = useState<string | null>(null);
+  const [silenceRegions, setSilenceRegions] = useState<SilenceRegion[] | null>(null);
+  const [silenceExpanded, setSilenceExpanded] = useState(true);
 
   const mediaList = Object.values(mediaFiles).filter((m) => m.type === 'video' || m.type === 'audio');
   const activeTranscript = activeTranscriptMediaId
@@ -108,6 +131,52 @@ export function TranscriptPanel() {
     if (captionsTimerRef.current) clearTimeout(captionsTimerRef.current);
     captionsTimerRef.current = setTimeout(() => setCaptionsJustAdded(false), 3000);
   }, [activeTranscriptMediaId, addTranscriptCaptionsToTimeline]);
+
+  const handleGenerateChapters = useCallback(async () => {
+    setIsGeneratingChapters(true);
+    setChapterError(null);
+    setPendingChapters(null);
+    try {
+      const state = storeApi.getState();
+      const chapters = await generateChapters(state);
+      setPendingChapters(chapters);
+      setChaptersExpanded(true);
+    } catch (err) {
+      setChapterError(err instanceof Error ? err.message : 'Chapter generation failed');
+    } finally {
+      setIsGeneratingChapters(false);
+    }
+  }, [storeApi]);
+
+  const handleAddChaptersToTimeline = useCallback(() => {
+    if (!pendingChapters) return;
+    addChapterMarkersToTimeline(pendingChapters);
+    setPendingChapters(null);
+  }, [pendingChapters, addChapterMarkersToTimeline]);
+
+  const handleDetectSilence = useCallback(async () => {
+    if (!activeTranscriptMediaId) return;
+    const media = mediaFiles[activeTranscriptMediaId];
+    if (!media?.url) return;
+    setIsDetectingSilence(true);
+    setSilenceError(null);
+    setSilenceRegions(null);
+    try {
+      const regions = await detectSilence(media.url);
+      setSilenceRegions(regions);
+      setSilenceExpanded(true);
+    } catch (err) {
+      setSilenceError(err instanceof Error ? err.message : 'Silence detection failed');
+    } finally {
+      setIsDetectingSilence(false);
+    }
+  }, [activeTranscriptMediaId, mediaFiles]);
+
+  const handleRemoveSilences = useCallback(() => {
+    if (!activeTranscriptMediaId || !silenceRegions) return;
+    removeSilenceRegions(activeTranscriptMediaId, silenceRegions);
+    setSilenceRegions(null);
+  }, [activeTranscriptMediaId, silenceRegions, removeSilenceRegions]);
 
   const fillerCount = activeTranscript
     ? activeTranscript.segments.reduce(
@@ -269,7 +338,73 @@ export function TranscriptPanel() {
               <Layers size={11} />
               {t.transcript.detectScenes}
             </button>
+
+            {/* Generate Chapters */}
+            <button
+              onClick={handleGenerateChapters}
+              disabled={isGeneratingChapters || (!settings.openaiApiKey && !settings.anthropicApiKey)}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors hover:opacity-80"
+              style={{
+                background: 'var(--accent)',
+                color: 'white',
+                opacity: isGeneratingChapters || (!settings.openaiApiKey && !settings.anthropicApiKey) ? 0.5 : 1,
+              }}
+              title="Generate chapter markers from transcript using AI"
+            >
+              {isGeneratingChapters ? <Loader2 size={11} className="animate-spin" /> : <BookMarked size={11} />}
+              Chapters
+            </button>
           </div>
+
+          {/* Chapter results */}
+          {(chapterError || pendingChapters) && (
+            <div className="px-3 py-2 border-b text-xs" style={{ borderColor: 'var(--border)' }}>
+              {chapterError && <p style={{ color: '#ef4444' }}>{chapterError}</p>}
+              {pendingChapters && (
+                <>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {pendingChapters.length} chapters
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setChaptersExpanded((v) => !v)}
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        {chaptersExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                      </button>
+                      <button
+                        onClick={handleAddChaptersToTimeline}
+                        className="px-2 py-0.5 rounded font-semibold"
+                        style={{ background: 'var(--accent)', color: 'white' }}
+                      >
+                        Add to Timeline
+                      </button>
+                      <button
+                        onClick={() => setPendingChapters(null)}
+                        className="px-2 py-0.5 rounded"
+                        style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)' }}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                  {chaptersExpanded && (
+                    <div className="space-y-0.5 mt-1">
+                      {pendingChapters.map((ch, i) => (
+                        <div key={i} className="flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
+                          <span className="font-mono opacity-50 text-xs">
+                            {String(Math.floor(ch.start / 60)).padStart(2, '0')}:{String(Math.floor(ch.start % 60)).padStart(2, '0')}
+                          </span>
+                          <span>{ch.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -278,6 +413,61 @@ export function TranscriptPanel() {
         <div className="px-3 py-1.5 border-b text-xs" style={{ borderColor: 'var(--border)', background: 'rgba(245,158,11,0.08)', color: 'var(--text-secondary)' }}>
           <span className="font-bold" style={{ color: 'var(--filler-highlight)' }}>DEMO</span>
           {' '}— captions still work, but text won't match your audio. Add a Deepgram or OpenAI key in Settings for real transcription.
+        </div>
+      )}
+
+      {/* Silence Detection */}
+      {activeTranscriptMediaId && mediaFiles[activeTranscriptMediaId]?.url && (
+        <div className="px-3 py-2 border-b" style={{ borderColor: 'var(--border)' }}>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+              Silence Detection
+            </span>
+            <button
+              onClick={handleDetectSilence}
+              disabled={isDetectingSilence}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors hover:opacity-80"
+              style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)', opacity: isDetectingSilence ? 0.5 : 1 }}
+            >
+              {isDetectingSilence ? <Loader2 size={11} className="animate-spin" /> : <VolumeX size={11} />}
+              {isDetectingSilence ? 'Analyzing...' : 'Detect Silence'}
+            </button>
+          </div>
+          {silenceError && <p className="text-xs mt-1" style={{ color: '#ef4444' }}>{silenceError}</p>}
+          {silenceRegions !== null && (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  {silenceRegions.length === 0
+                    ? 'No silences found'
+                    : `${silenceRegions.length} silence${silenceRegions.length !== 1 ? 's' : ''} (${silenceRegions.reduce((s, r) => s + r.duration, 0).toFixed(1)}s total)`}
+                </span>
+                {silenceRegions.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setSilenceExpanded((v) => !v)} style={{ color: 'var(--text-secondary)' }}>
+                      {silenceExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                    </button>
+                    <button
+                      onClick={handleRemoveSilences}
+                      className="text-xs px-2 py-0.5 rounded font-semibold"
+                      style={{ background: 'var(--accent)', color: 'white' }}
+                    >
+                      Remove All
+                    </button>
+                  </div>
+                )}
+              </div>
+              {silenceExpanded && silenceRegions.length > 0 && (
+                <div className="mt-1 space-y-0.5 max-h-24 overflow-y-auto">
+                  {silenceRegions.map((r, i) => (
+                    <div key={i} className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
+                      {String(Math.floor(r.start / 60)).padStart(2, '0')}:{String(Math.floor(r.start % 60)).padStart(2, '0')} — {String(Math.floor(r.end / 60)).padStart(2, '0')}:{String(Math.floor(r.end % 60)).padStart(2, '0')} ({r.duration.toFixed(1)}s)
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

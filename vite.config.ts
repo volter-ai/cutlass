@@ -45,6 +45,13 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/api\/openai/, ''),
           secure: true,
         },
+        // Proxy Anthropic API calls (Claude)
+        '/api/anthropic': {
+          target: 'https://api.anthropic.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/anthropic/, ''),
+          secure: true,
+        },
       },
     },
     optimizeDeps: {

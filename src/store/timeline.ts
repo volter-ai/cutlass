@@ -47,6 +47,12 @@ const DEFAULT_SETTINGS: ProjectSettings = {
   openaiApiKey: typeof localStorage !== 'undefined'
     ? localStorage.getItem('cutlass-openai-key') ?? ''
     : '',
+  anthropicApiKey: typeof localStorage !== 'undefined'
+    ? localStorage.getItem('cutlass-anthropic-key') ?? ''
+    : '',
+  aiModel: ((typeof localStorage !== 'undefined'
+    ? localStorage.getItem('cutlass-ai-model')
+    : null) ?? 'gpt-4o') as import('../types').AIModel,
   backgroundColor: '#000000',
 };
 
@@ -177,11 +183,15 @@ export interface TimelineState {
   removeFillerWords: (mediaFileId: string, mode: FillerRemovalMode) => void;
   detectScenes: (mediaFileId: string) => void;
   addTranscriptCaptionsToTimeline: (mediaFileId: string) => void;
+  addChapterMarkersToTimeline: (chapters: { name: string; start: number }[]) => void;
+  removeSilenceRegions: (mediaFileId: string, regions: { start: number; end: number }[]) => void;
 
   // Actions - Settings
   setAspectRatio: (ratio: AspectRatio) => void;
   setDeepgramApiKey: (key: string) => void;
   setOpenaiApiKey: (key: string) => void;
+  setAnthropicApiKey: (key: string) => void;
+  setAiModel: (model: import('../types').AIModel) => void;
   setCaptionStyle: (style: Partial<CaptionStyle>) => void;
   setBackgroundColor: (color: string) => void;
   setSettings: (settings: Partial<ProjectSettings>) => void;
@@ -224,6 +234,10 @@ export interface TimelineStoreOptions {
   initialMediaFiles?: Record<string, MediaFile>;
   initialSettings?: Partial<ProjectSettings>;
 }
+
+// Module-level cache for getSnapPoints — invalidated when the clips reference changes.
+// Avoids rebuilding the sorted point array on every drag mousemove event (~60fps).
+let snapPointsCache: { key: unknown; points: number[] } = { key: null, points: [] };
 
 const DEFAULT_TEXT_STYLE: TextStyle = {
   fontFamily: 'Arial',
@@ -393,10 +407,13 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           set((state) => {
             const clip = state.clips[clipId];
             if (!clip) return;
-            const delta = newStartTime - clip.startTime;
-            clip.mediaOffset += delta;
+            // Clamp: can't trim past the clip's own end, and mediaOffset can't go negative
+            const maxStart = clip.startTime + clip.duration - 0.1; // keep at least 0.1s
+            const clampedStart = Math.min(newStartTime, maxStart);
+            const delta = clampedStart - clip.startTime;
+            clip.mediaOffset = Math.max(0, clip.mediaOffset + delta);
             clip.duration -= delta;
-            clip.startTime = newStartTime;
+            clip.startTime = clampedStart;
             // Clamp fade-in so it never exceeds half the new duration
             clip.fadeIn = Math.min(clip.fadeIn, clip.duration / 2);
           }),
@@ -405,7 +422,9 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           set((state) => {
             const clip = state.clips[clipId];
             if (!clip) return;
-            clip.duration = newEndTime - clip.startTime;
+            // Clamp: new end must be at least 0.1s past the clip start
+            const clampedEnd = Math.max(newEndTime, clip.startTime + 0.1);
+            clip.duration = clampedEnd - clip.startTime;
             // Clamp fade-out so it never exceeds half the new duration
             clip.fadeOut = Math.min(clip.fadeOut, clip.duration / 2);
           }),
@@ -1093,6 +1112,120 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
           get().recalculateDuration();
         },
 
+        addChapterMarkersToTimeline: (chapters) => {
+          const state = get();
+
+          // Find or create a text track
+          let textTrackId = state.tracks.find((t) => t.type === 'text')?.id;
+          if (!textTrackId) {
+            textTrackId = uuid();
+            set((s) => {
+              s.tracks.push({ id: textTrackId!, type: 'text', name: 'T1', muted: false, locked: false, height: 32, volume: 1 });
+            });
+          }
+
+          set((s) => {
+            for (const chapter of chapters) {
+              const id = uuid();
+              s.textOverlays[id] = {
+                id,
+                trackId: textTrackId!,
+                startTime: chapter.start,
+                duration: 5,
+                text: chapter.name,
+                style: {
+                  fontFamily: 'Arial',
+                  fontSize: 28,
+                  fontWeight: 'bold',
+                  color: '#ffffff',
+                  backgroundColor: 'rgba(0,0,0,0.7)',
+                  x: 10,
+                  y: 8,
+                  textAlign: 'left',
+                  outline: false,
+                  outlineColor: '#000000',
+                },
+              };
+            }
+          });
+
+          get().recalculateDuration();
+          track('feature.used', { feature: 'addChapterMarkers' });
+        },
+
+        removeSilenceRegions: (mediaFileId, regions) => {
+          // Compute all timeline ranges to remove from the clip coordinates
+          const currentClips = Object.values(get().clips);
+          const timelineRanges: { start: number; end: number; trackId: string }[] = [];
+
+          for (const region of regions) {
+            for (const clip of currentClips) {
+              if (clip.mediaFileId !== mediaFileId) continue;
+              const oStart = Math.max(region.start, clip.mediaOffset);
+              const oEnd = Math.min(region.end, clip.mediaOffset + clip.duration);
+              if (oEnd - oStart < 0.02) continue; // negligible overlap
+              // Silence position on the timeline (accounting for speed)
+              const tStart = clip.startTime + (oStart - clip.mediaOffset) / clip.speed;
+              const tEnd = clip.startTime + (oEnd - clip.mediaOffset) / clip.speed;
+              timelineRanges.push({ start: tStart, end: tEnd, trackId: clip.trackId });
+            }
+          }
+
+          // Process latest-to-earliest so each ripple-delete doesn't shift earlier ranges
+          timelineRanges.sort((a, b) => b.start - a.start);
+
+          for (const range of timelineRanges) {
+            // Split at range.end first (later boundary), then range.start
+            for (const boundary of [range.end, range.start]) {
+              set((state) => {
+                for (const clip of Object.values(state.clips)) {
+                  const clipEnd = clip.startTime + clip.duration;
+                  if (boundary <= clip.startTime || boundary >= clipEnd) continue;
+                  const splitPoint = boundary - clip.startTime;
+                  const newId = uuid();
+                  state.clips[newId] = {
+                    id: newId,
+                    mediaFileId: clip.mediaFileId,
+                    trackId: clip.trackId,
+                    startTime: boundary,
+                    duration: clip.duration - splitPoint,
+                    mediaOffset: clip.mediaOffset + splitPoint * clip.speed,
+                    name: clip.name,
+                    type: clip.type,
+                    volume: clip.volume,
+                    speed: clip.speed,
+                    fadeIn: 0,
+                    fadeOut: clip.fadeOut,
+                    fitMode: clip.fitMode,
+                    scale: clip.scale,
+                    positionX: clip.positionX,
+                    positionY: clip.positionY,
+                    animation: clip.animation,
+                    transitionOut: clip.transitionOut,
+                  };
+                  clip.duration = splitPoint;
+                  clip.fadeOut = 0;
+                }
+              });
+            }
+
+            // Find the clip now sitting at range.start and ripple-delete it
+            for (const clip of Object.values(get().clips)) {
+              if (clip.trackId !== range.trackId) continue;
+              if (
+                Math.abs(clip.startTime - range.start) < 0.02 &&
+                Math.abs(clip.startTime + clip.duration - range.end) < 0.02
+              ) {
+                get().rippleDelete(clip.id);
+                break;
+              }
+            }
+          }
+
+          get().recalculateDuration();
+          track('feature.used', { feature: 'removeSilence' });
+        },
+
         // Settings
         setAspectRatio: (ratio) =>
           set((state) => {
@@ -1113,6 +1246,22 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
             state.settings.openaiApiKey = key;
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem('cutlass-openai-key', key);
+            }
+          }),
+
+        setAnthropicApiKey: (key) =>
+          set((state) => {
+            state.settings.anthropicApiKey = key;
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('cutlass-anthropic-key', key);
+            }
+          }),
+
+        setAiModel: (model) =>
+          set((state) => {
+            state.settings.aiModel = model;
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('cutlass-ai-model', model);
             }
           }),
 
@@ -1214,6 +1363,10 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
 
         getSnapPoints: () => {
           const state = get();
+          // Cache snap points keyed to clips/overlays identity.
+          // Drag mousemove fires ~60fps — rebuilding from scratch each time is wasteful.
+          const cacheKey = state.clips;
+          if (snapPointsCache.key === cacheKey) return snapPointsCache.points;
           const points: number[] = [0];
           Object.values(state.clips).forEach((clip) => {
             points.push(clip.startTime);
@@ -1234,7 +1387,9 @@ export function createTimelineStore(options?: TimelineStoreOptions) {
               points.push(s.end);
             });
           });
-          return [...new Set(points)].sort((a, b) => a - b);
+          const result = [...new Set(points)].sort((a, b) => a - b);
+          snapPointsCache = { key: cacheKey, points: result };
+          return result;
         },
 
         recalculateDuration: () =>

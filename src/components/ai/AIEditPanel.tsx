@@ -32,7 +32,9 @@ export function AIEditPanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const hasApiKey = !!settings.openaiApiKey;
+  const activeModel = settings.aiModel ?? 'gpt-4o';
+  const activeKey = activeModel === 'gpt-4o' ? settings.openaiApiKey : settings.anthropicApiKey;
+  const hasApiKey = !!activeKey;
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -69,7 +71,7 @@ export function AIEditPanel() {
         }
       }
 
-      const result = await parseChat(state, trimmed, settings.openaiApiKey, history);
+      const result = await parseChat(state, trimmed, history);
 
       if (result.operations.length === 0) {
         addMessage({ role: 'assistant', text: result.summary || 'No changes needed.' });
@@ -89,7 +91,7 @@ export function AIEditPanel() {
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, messages, settings.openaiApiKey, storeApi, addMessage]);
+  }, [input, isLoading, messages, storeApi, addMessage]);
 
   // --- Document mode ---
 
@@ -101,7 +103,7 @@ export function AIEditPanel() {
 
     try {
       const state = storeApi.getState();
-      const result = await parseDocument(state, trimmed, settings.openaiApiKey);
+      const result = await parseDocument(state, trimmed);
 
       if (result.operations.length === 0) {
         addMessage({ role: 'assistant', text: result.summary || 'No changes needed.' });
@@ -123,7 +125,7 @@ export function AIEditPanel() {
     } finally {
       setIsLoading(false);
     }
-  }, [docText, isLoading, settings.openaiApiKey, storeApi, addMessage]);
+  }, [docText, isLoading, storeApi, addMessage]);
 
   // --- Apply operations ---
 

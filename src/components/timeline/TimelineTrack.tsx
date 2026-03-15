@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useState, useRef, useMemo } from 'react';
 import { Volume2, VolumeX, Lock, Unlock, Eye, EyeOff, Type, Pencil } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
@@ -26,17 +26,20 @@ export function TimelineTrack({ track }: Props) {
   const [pendingText, setPendingText] = useState('');
   const pendingInputRef = useRef<HTMLInputElement>(null);
 
-  const trackClips = Object.values(clips)
-    .filter((c) => c.trackId === track.id)
-    .sort((a, b) => a.startTime - b.startTime);
+  const trackClips = useMemo(
+    () => Object.values(clips).filter((c) => c.trackId === track.id).sort((a, b) => a.startTime - b.startTime),
+    [clips, track.id],
+  );
 
-  const trackTextOverlays = Object.values(textOverlays)
-    .filter((o) => o.trackId === track.id)
-    .sort((a, b) => a.startTime - b.startTime);
+  const trackTextOverlays = useMemo(
+    () => Object.values(textOverlays).filter((o) => o.trackId === track.id).sort((a, b) => a.startTime - b.startTime),
+    [textOverlays, track.id],
+  );
 
-  const trackDrawingOverlays = Object.values(drawingOverlays)
-    .filter((o) => o.trackId === track.id)
-    .sort((a, b) => a.startTime - b.startTime);
+  const trackDrawingOverlays = useMemo(
+    () => Object.values(drawingOverlays).filter((o) => o.trackId === track.id).sort((a, b) => a.startTime - b.startTime),
+    [drawingOverlays, track.id],
+  );
 
   const totalWidth = duration * zoom;
   const isVideo = track.type === 'video';

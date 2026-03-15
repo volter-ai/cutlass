@@ -124,12 +124,24 @@ function parseDeepgramResponse(mediaFileId: string, data: DeepgramResponse): Tra
 }
 
 const WHISPER_MAX_BYTES = 25 * 1024 * 1024; // 25 MB
+// Audio extraction via Web Audio API decodes raw PCM into RAM.
+// Decoded size ≈ sampleRate(44100) × channels(2) × bytesPerSample(4) × duration(s).
+// For a 10-min video that's ~200 MB in RAM, which is fine. For a 2-hour video it's ~2.4 GB.
+// We gate extraction at 500 MB to avoid OOM on long files.
+const EXTRACTION_MAX_BYTES = 500 * 1024 * 1024;
 
 async function transcribeWithOpenAI(media: MediaFile, apiKey: string): Promise<Transcript> {
   let fileToSend: File | Blob = media.file;
 
-  // If it's a video file and exceeds 25 MB, extract audio via Web Audio API
+  // If it's a video file and exceeds 25 MB, extract audio via Web Audio API.
+  // Skip extraction for very large files (> 500 MB) where decoded PCM would OOM the tab.
   if (media.file.size > WHISPER_MAX_BYTES && media.type === 'video') {
+    if (media.file.size > EXTRACTION_MAX_BYTES) {
+      throw new Error(
+        `File is ${(media.file.size / 1024 / 1024).toFixed(0)} MB — too large to process in the browser. ` +
+        `Use Deepgram (which streams the file) or trim the video to under 500 MB first.`,
+      );
+    }
     try {
       fileToSend = await extractAudioFromVideo(media.file);
     } catch {

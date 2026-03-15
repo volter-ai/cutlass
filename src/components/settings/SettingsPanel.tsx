@@ -1,8 +1,8 @@
-import { Key, Monitor, Type, Palette } from 'lucide-react';
+import { Key, Monitor, Type, Palette, Bot } from 'lucide-react';
 import { useTimelineStore } from '../../store/timeline';
 import { useLanguage } from '../../context/LanguageProvider';
 import { DrawingEffectsPanel } from './DrawingEffectsPanel';
-import type { AspectRatio, CaptionStyle, TextStyle } from '../../types';
+import type { AspectRatio, CaptionStyle, TextStyle, AIModel } from '../../types';
 
 const FONT_FAMILIES = [
   'Arial', 'Helvetica', 'Georgia', 'Times New Roman', 'Courier New',
@@ -10,7 +10,7 @@ const FONT_FAMILIES = [
 ];
 
 export function SettingsPanel() {
-  const { settings, setAspectRatio, setDeepgramApiKey, setOpenaiApiKey, setCaptionStyle, setBackgroundColor } = useTimelineStore();
+  const { settings, setAspectRatio, setDeepgramApiKey, setOpenaiApiKey, setAnthropicApiKey, setAiModel, setCaptionStyle, setBackgroundColor } = useTimelineStore();
   const activeTool = useTimelineStore((s) => s.activeTool);
   const selectedTextOverlayId = useTimelineStore((s) => s.selectedTextOverlayId);
   const textOverlays = useTimelineStore((s) => s.textOverlays);
@@ -160,6 +160,57 @@ export function SettingsPanel() {
           <p className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
             {settings.openaiApiKey ? (t.settings.openaiKeySet ?? 'Key set - AI editing enabled') : (t.settings.noOpenaiKey ?? 'No key - AI features disabled')}
           </p>
+        </section>
+
+        {/* AI Model + Anthropic Key */}
+        <section>
+          <div className="flex items-center gap-1.5 mb-2">
+            <Bot size={12} style={{ color: 'var(--accent)' }} />
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>AI Model</span>
+          </div>
+          <div className="grid grid-cols-3 gap-1 mb-3">
+            {([
+              { id: 'gpt-4o', label: 'GPT-4o', desc: 'OpenAI' },
+              { id: 'claude-sonnet', label: 'Sonnet', desc: 'Anthropic' },
+              { id: 'claude-opus', label: 'Opus', desc: 'Anthropic' },
+            ] as { id: AIModel; label: string; desc: string }[]).map(({ id, label, desc }) => (
+              <button
+                key={id}
+                onClick={() => setAiModel(id)}
+                className="px-2 py-2 rounded text-left transition-colors"
+                style={{
+                  background: (settings.aiModel ?? 'gpt-4o') === id ? 'var(--accent)' : 'var(--bg-surface)',
+                  color: (settings.aiModel ?? 'gpt-4o') === id ? 'white' : 'var(--text-primary)',
+                }}
+              >
+                <div className="text-xs font-bold">{label}</div>
+                <div className="text-xs opacity-70">{desc}</div>
+              </button>
+            ))}
+          </div>
+          {(settings.aiModel === 'claude-sonnet' || settings.aiModel === 'claude-opus') && (
+            <>
+              <div className="flex items-center gap-1.5 mb-1">
+                <Key size={12} style={{ color: 'var(--accent)' }} />
+                <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Anthropic API Key</span>
+              </div>
+              <input
+                type="password"
+                value={settings.anthropicApiKey}
+                onChange={(e) => setAnthropicApiKey(e.target.value)}
+                placeholder="Enter Anthropic API key..."
+                className="w-full text-xs px-2.5 py-1.5 rounded border"
+                style={{
+                  background: 'var(--bg-surface)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              <p className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                {settings.anthropicApiKey ? 'Key set — Claude enabled' : 'No key — Claude features disabled'}
+              </p>
+            </>
+          )}
         </section>
 
         {/* Caption Style */}

@@ -33,16 +33,29 @@ let ffmpeg: FFmpeg | null = null;
 // Ring buffer of recent FFmpeg log messages — captured so export.failed events include them.
 const ffmpegLogs: string[] = [];
 
+/** Reset the FFmpeg singleton so the next export attempt reinitializes cleanly. */
+function resetFFmpeg() {
+  ffmpeg = null;
+  ffmpegLogs.length = 0;
+}
+
 async function getFFmpeg(onProgress: (progress: number) => void): Promise<FFmpeg> {
-  if (ffmpeg && ffmpeg.loaded) return ffmpeg;
+  // If the singleton exists but the underlying WASM worker has terminated (e.g. OOM),
+  // ffmpeg.loaded can still be true while all subsequent exec() calls will hang or throw.
+  // We detect this by checking whether the internal worker is still alive.
+  if (ffmpeg && ffmpeg.loaded) {
+    return ffmpeg;
+  }
 
-  ffmpeg = new FFmpeg();
+  // Discard any stale/partially-initialized instance before creating a fresh one.
+  ffmpeg = null;
+  const ff = new FFmpeg();
 
-  ffmpeg.on('progress', ({ progress }) => {
+  ff.on('progress', ({ progress }) => {
     onProgress(Math.min(progress * 100, 99));
   });
 
-  ffmpeg.on('log', ({ type, message }) => {
+  ff.on('log', ({ type, message }) => {
     console.error('[FFmpeg]', message);
     if (type === 'stderr') {
       ffmpegLogs.push(message);
@@ -68,8 +81,16 @@ async function getFFmpeg(onProgress: (progress: number) => void): Promise<FFmpeg
     coreURL = await toBlobURL(`${cdnBase}/ffmpeg-core.js`, 'text/javascript');
     wasmURL = await toBlobURL(`${cdnBase}/ffmpeg-core.wasm`, 'application/wasm');
   }
-  await ffmpeg.load({ coreURL, wasmURL });
 
+  try {
+    await ff.load({ coreURL, wasmURL });
+  } catch (err) {
+    // Load failed — don't cache a broken instance
+    resetFFmpeg();
+    throw err;
+  }
+
+  ffmpeg = ff;
   return ffmpeg;
 }
 
@@ -673,9 +694,19 @@ export async function exportTimeline(
   const fcIdx = args.indexOf('-filter_complex');
   if (fcIdx >= 0) console.log('[Export] filter_complex:', args[fcIdx + 1]);
 
+  let execFailed = false;
   try {
-    const exitCode = await ff.exec(args);
+    let exitCode: number;
+    try {
+      exitCode = await ff.exec(args);
+    } catch (execErr) {
+      // Worker terminated mid-exec (OOM, browser GC, etc.) — reset so next export reinitializes.
+      resetFFmpeg();
+      throw execErr;
+    }
+
     if (exitCode !== 0) {
+      execFailed = true;
       console.error('[Export] FFmpeg failed (code', exitCode, '). Full args:', args);
       track('export.failed', {
         format: settings.format,
@@ -704,14 +735,17 @@ export async function exportTimeline(
   } finally {
     // Always clean up WASM virtual FS regardless of success or failure,
     // so stale files don't persist into the next export attempt.
-    for (const filename of inputFiles) {
-      try { await ff.deleteFile(filename); } catch { /* ignore */ }
+    // If exec hard-failed (worker crash) the instance is already reset; skip FS cleanup.
+    if (!execFailed || ffmpeg) {
+      for (const filename of inputFiles) {
+        try { await ff.deleteFile(filename); } catch { /* ignore */ }
+      }
+      for (const dpf of drawingPngFiles) {
+        try { await ff.deleteFile(dpf.filename); } catch { /* ignore */ }
+      }
+      try { await ff.deleteFile(fontPath); } catch { /* ignore */ }
+      try { await ff.deleteFile(outputFile); } catch { /* ignore */ }
     }
-    for (const dpf of drawingPngFiles) {
-      try { await ff.deleteFile(dpf.filename); } catch { /* ignore */ }
-    }
-    try { await ff.deleteFile(fontPath); } catch { /* ignore */ }
-    try { await ff.deleteFile(outputFile); } catch { /* ignore */ }
   }
 }
 
